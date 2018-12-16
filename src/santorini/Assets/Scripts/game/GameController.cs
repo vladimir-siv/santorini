@@ -24,16 +24,16 @@ public sealed class GameController : MonoBehaviour
 		(char row, int col) position = ('A', 1);
 
 		position = await player1.PlaceFigure();
-		board.PlacePlayer(position.row, position.col, player1Object, player1);
+		board.PlaceFigure(position.row, position.col, player1Object, player1);
 		
 		position = await player1.PlaceFigure();
-		board.PlacePlayer(position.row, position.col, player1Object, player1);
+		board.PlaceFigure(position.row, position.col, player1Object, player1);
 
 		position = await player2.PlaceFigure();
-		board.PlacePlayer(position.row, position.col, player2Object, player2);
+		board.PlaceFigure(position.row, position.col, player2Object, player2);
 
 		position = await player2.PlaceFigure();
-		board.PlacePlayer(position.row, position.col, player2Object, player2);
+		board.PlaceFigure(position.row, position.col, player2Object, player2);
 
 		onTurn = player1;
 		IsInitialized = true;
@@ -59,15 +59,15 @@ public sealed class GameController : MonoBehaviour
 			IsInitialized = false;
 			goto ret;
 		}
-
+		
 		(char row, int col) playerFrom;
-		do playerFrom = await onTurn.SelectPlayer(); while (board[playerFrom.row, playerFrom.col].Standing != onTurn);
-
-		var allowedMovement = board.FindAdjacentFields(playerFrom, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: false);
+		do playerFrom = await onTurn.SelectFigure(positions.p1, positions.p2); while (board[playerFrom.row, playerFrom.col].Standing != onTurn);
+		
+		var allowedMovements = board.FindAdjacentFields(playerFrom, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true);
 		(char row, int col) moveTo;
-		do moveTo = await onTurn.MovePlayer(playerFrom); while (!allowedMovement.Contains(board[moveTo.row, moveTo.col]));
+		do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains(board[moveTo.row, moveTo.col]) && (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col));
 		if (playerFrom.row == moveTo.row && playerFrom.col == moveTo.col) goto ret;
-		board.MovePlayer(playerFrom, moveTo);
+		board.MoveFigure(playerFrom, moveTo);
 
 		if (board[moveTo.row, moveTo.col].Level == Building.TILES_COUNT - 1)
 		{
@@ -76,9 +76,9 @@ public sealed class GameController : MonoBehaviour
 			goto ret;
 		}
 
-		var allowedBuilding = board.FindAdjacentFields(moveTo, constrainLevels: false, constrainBlockedOrFilled: true);
+		var allowedBuildings = board.FindAdjacentFields(moveTo, constrainLevels: false, constrainBlockedOrFilled: true, constrainSelf: true);
 		(char row, int col) buildOn;
-		do buildOn = await onTurn.BuildOn(moveTo); while (!allowedBuilding.Contains(board[buildOn.row, buildOn.col]));
+		do buildOn = await onTurn.BuildOn(moveTo, allowedBuildings); while (!allowedBuildings.Contains(board[buildOn.row, buildOn.col]));
 		board[buildOn.row, buildOn.col].Build();
 
 		onTurn = onTurn == player1 ? player2 : player1;

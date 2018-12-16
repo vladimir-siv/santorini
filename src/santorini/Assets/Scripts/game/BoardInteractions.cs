@@ -1,18 +1,27 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
 public class BoardInteractions : MonoBehaviour
 {
+	private Board board = null;
+
 	private Camera mainCamera = null;
 	private (GameObject obj, Material mat, Color col) lastField = (null, null, default(Color));
 
-	private SemaphoreSlim mutex = new SemaphoreSlim(1, 1);
-	private SemaphoreSlim interactor = new SemaphoreSlim(0, 1);
+	private readonly SemaphoreSlim mutex = new SemaphoreSlim(1, 1);
+	private readonly SemaphoreSlim interactor = new SemaphoreSlim(0, 1);
 	private bool interact = false;
 	private Func<Field, bool> filter = null;
 	public (char, int) Position { get; private set; } = ('A', 1);
+
+	void Awake()
+	{
+		board = GameObject.FindGameObjectWithTag("Board").GetComponent<Board>();
+		mainCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<Camera>();
+	}
 
 	public async Task<(char, int)> StartInteracting(Func<Field, bool> filter = null)
 	{
@@ -35,9 +44,24 @@ public class BoardInteractions : MonoBehaviour
 		);
 	}
 
-	void Awake()
+	public void ShowPossibleOptions(List<Field> adjacentFields)
 	{
-		mainCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<Camera>();
+		for (var i = 0; i < adjacentFields.Count; ++i)
+		{
+			var obj = adjacentFields[i].ActiveObject;
+			obj.GetComponent<Renderer>().material.SetColor("_Color", new Color(.102f, .373f, .576f));
+		}
+	}
+
+	public void ClearPossibleOptions(List<Field> adjacentFields)
+	{
+		for (var i = 0; i < adjacentFields.Count; ++i)
+		{
+			var obj = adjacentFields[i].ActiveObject;
+			var building = obj.FindObjectBuilding();
+			if (building == null) obj.GetComponent<Renderer>().material.SetColor("_Color", Color.white);
+			else building.GetComponent<Building>().UpdateGraphics();
+		}
 	}
 
 	void Update()
@@ -65,7 +89,6 @@ public class BoardInteractions : MonoBehaviour
 		if (lastField.obj != null)
 		{
 			// Mouse Leave
-
 			lastField.mat.SetColor("_Color", lastField.col);
 			lastField = (null, null, default(Color));
 		}
@@ -73,24 +96,9 @@ public class BoardInteractions : MonoBehaviour
 		if (field != null)
 		{
 			// Mouse Enter
-
 			if (!field.GetComponent<Field>().IsBlocked && (filter == null || filter(field.GetComponent<Field>())))
 			{
-				GameObject obj = null;
-				var objectChildren = field.GetObjectChildren();
-				var childCount = objectChildren.transform.childCount;
-
-				if (childCount == 0)
-				{
-					var objectGraphics = field.GetObjectGraphics();
-					obj = objectGraphics.GetChild(0);
-				}
-				else
-				{
-					obj = objectChildren.GetChild(childCount - 1);
-					obj = obj.GetObjectGraphics().GetChild(0);
-				}
-
+				var obj = field.GetComponent<Field>().ActiveObject;
 				var material = obj.GetComponent<Renderer>().material;
 				var color = material.GetColor("_Color");
 				material.SetColor("_Color", Color.gray);

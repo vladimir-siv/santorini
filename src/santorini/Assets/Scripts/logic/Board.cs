@@ -69,12 +69,12 @@ public sealed class Board : MonoBehaviour
 		return positions;
 	}
 
-	public void PlacePlayer(char row, int col, GameObject playerObject, Player player)
+	public void PlaceFigure(char row, int col, GameObject playerObject, Player player)
 	{
-		this[row, col].PlacePlayer(playerObject, player);
+		this[row, col].PlaceFigure(playerObject, player);
 	}
 
-	public bool MovePlayer((char row, int col) from, (char row, int col) to)
+	public bool MoveFigure((char row, int col) from, (char row, int col) to)
 	{
 		return this[from.row, from.col] > this[to.row, to.col];
 	}

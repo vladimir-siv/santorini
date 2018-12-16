@@ -9,6 +9,28 @@ public sealed class Field : MonoBehaviour
 	public bool IsBlocked { get; private set; } = false;
 	public int Level { get; private set; } = -1;
 	public Player Standing { get; private set; } = null;
+	public GameObject ActiveObject
+	{
+		get
+		{
+			GameObject obj = null;
+			var objectChildren = gameObject.GetObjectChildren();
+			var childCount = objectChildren.transform.childCount;
+
+			if (childCount == 0)
+			{
+				var objectGraphics = gameObject.GetObjectGraphics();
+				obj = objectGraphics.GetChild(0);
+			}
+			else
+			{
+				obj = objectChildren.GetChild(childCount - 1);
+				obj = obj.GetObjectGraphics().GetChild(0);
+			}
+
+			return obj;
+		}
+	}
 
 	void Awake()
 	{
@@ -20,7 +42,7 @@ public sealed class Field : MonoBehaviour
 		return new Vector3(0, (Level + 1 + (increment ? 1 : 0)) * 0.2f, 0);
 	}
 
-	public void PlacePlayer(GameObject playerObject, Player player)
+	public void PlaceFigure(GameObject playerObject, Player player)
 	{
 		var obj = Instantiate(playerObject, Vector3.zero, Quaternion.identity, objectChildren);
 		obj.transform.localPosition = delta(true);

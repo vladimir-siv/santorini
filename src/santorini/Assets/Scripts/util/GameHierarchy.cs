@@ -24,6 +24,13 @@ public static class GameHierarchy
 		return null;
 	}
 
+	public static GameObject FindObjectBuilding(this GameObject obj)
+	{
+		for (Transform current = obj.transform; current != null; current = current.parent)
+			if (current.gameObject.tag == "Building") return current.gameObject;
+		return null;
+	}
+
 	public static GameObject GetChild(this GameObject obj, int child)
 	{
 		return obj.transform.GetChild(child).gameObject;

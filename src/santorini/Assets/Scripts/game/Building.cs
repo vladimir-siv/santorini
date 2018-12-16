@@ -34,7 +34,7 @@ public sealed class Building : MonoBehaviour
 		UpdateGraphics();
 	}
 
-	private void UpdateGraphics()
+	public void UpdateGraphics()
 	{
 		if (Level < TILES_COUNT)
 		{
