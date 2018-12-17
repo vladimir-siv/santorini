@@ -7,6 +7,8 @@ TagManager:
   - Board
   - Field
   - Building
+  - UI-StatusText
+  - UI-OutcomeText
   layers:
   - Default
   - TransparentFX

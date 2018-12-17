@@ -23,14 +23,22 @@ public sealed class GameController : MonoBehaviour
 	{
 		(char row, int col) position = ('A', 1);
 
-		position = await player1.PlaceFigure();
-		board.PlaceFigure(position.row, position.col, player1Object, player1);
-		
+		UI.Status = $"Status:\r\nPlayer{player1.No} placing 1. figure";
+
 		position = await player1.PlaceFigure();
 		board.PlaceFigure(position.row, position.col, player1Object, player1);
 
+		UI.Status = $"Status:\r\nPlayer{player1.No} placing 2. figure";
+
+		position = await player1.PlaceFigure();
+		board.PlaceFigure(position.row, position.col, player1Object, player1);
+
+		UI.Status = $"Status:\r\nPlayer{player2.No} placing 1. figure";
+
 		position = await player2.PlaceFigure();
 		board.PlaceFigure(position.row, position.col, player2Object, player2);
+
+		UI.Status = $"Status:\r\nPlayer{player2.No} placing 2. figure";
 
 		position = await player2.PlaceFigure();
 		board.PlaceFigure(position.row, position.col, player2Object, player2);
@@ -55,14 +63,17 @@ public sealed class GameController : MonoBehaviour
 		)
 		{
 			onTurn = onTurn == player1 ? player2 : player1;
-			Debug.Log($"Plyer {onTurn.No} won the game by blocking his opponent!");
+			UI.Status = "Status:\r\nGame end";
+			UI.Outcome = $"Player{onTurn.No} wins!";
 			IsInitialized = false;
 			goto ret;
 		}
-		
+
+		UI.Status = $"Status:\r\nPlayer{onTurn.No} selecting figure";
 		(char row, int col) playerFrom;
 		do playerFrom = await onTurn.SelectFigure(positions.p1, positions.p2); while (board[playerFrom.row, playerFrom.col].Standing != onTurn);
-		
+
+		UI.Status = $"Status:\r\nPlayer{onTurn.No} moving figure";
 		var allowedMovements = board.FindAdjacentFields(playerFrom, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true);
 		(char row, int col) moveTo;
 		do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains(board[moveTo.row, moveTo.col]) && (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col));
@@ -71,11 +82,13 @@ public sealed class GameController : MonoBehaviour
 
 		if (board[moveTo.row, moveTo.col].Level == Building.TILES_COUNT - 1)
 		{
-			Debug.Log($"Plyer {onTurn.No} won the game!");
+			UI.Status = "Status:\r\nGame end";
+			UI.Outcome = $"Player{onTurn.No} wins!";
 			IsInitialized = false;
 			goto ret;
 		}
 
+		UI.Status = $"Status:\r\nPlayer{onTurn.No} building";
 		var allowedBuildings = board.FindAdjacentFields(moveTo, constrainLevels: false, constrainBlockedOrFilled: true, constrainSelf: true);
 		(char row, int col) buildOn;
 		do buildOn = await onTurn.BuildOn(moveTo, allowedBuildings); while (!allowedBuildings.Contains(board[buildOn.row, buildOn.col]));
