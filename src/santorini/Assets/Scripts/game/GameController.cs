@@ -1,102 +1,161 @@
-﻿using UnityEngine;
+﻿using System.IO;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 
-public sealed class GameController : MonoBehaviour
+namespace etf.santorini.sv150155d.game
 {
-	public GameObject player1Object;
-	public GameObject player2Object;
+	using scenes;
+	using logic;
+	using players;
+	using ui;
+	using logging;
+	using util;
 
-	private Board board = null;
-
-	private Player player1 = new Human(1);
-	private Player player2 = new Human(2);
-	private Player onTurn = null;
-
-	private bool IsInitialized = false;
-	private bool IsCalculating = false;
-	
-	void Awake()
+	public sealed class GameController : MonoBehaviour
 	{
-		board = GameObject.FindGameObjectWithTag("Board").GetComponent<Board>();
-	}
+		public GameObject player1Object;
+		public GameObject player2Object;
 
-	async void Start()
-	{
-		(char row, int col) position = ('A', 1);
+		private GameLog gameLog = new GameLog();
 
-		UI.Status = $"Status:\r\nPlayer{player1.No} placing 1. figure";
+		private Board board = null;
 
-		position = await player1.PlaceFigure();
-		board.PlaceFigure(position.row, position.col, player1Object, player1);
+		private Player player1 = null;
+		private Player player2 = null;
+		private Player onTurn = null;
 
-		UI.Status = $"Status:\r\nPlayer{player1.No} placing 2. figure";
-
-		position = await player1.PlaceFigure();
-		board.PlaceFigure(position.row, position.col, player1Object, player1);
-
-		UI.Status = $"Status:\r\nPlayer{player2.No} placing 1. figure";
-
-		position = await player2.PlaceFigure();
-		board.PlaceFigure(position.row, position.col, player2Object, player2);
-
-		UI.Status = $"Status:\r\nPlayer{player2.No} placing 2. figure";
-
-		position = await player2.PlaceFigure();
-		board.PlaceFigure(position.row, position.col, player2Object, player2);
-
-		onTurn = player1;
-		IsInitialized = true;
-	}
-
-	async void Update()
-	{
-		if (!IsInitialized || IsCalculating) return;
-		IsCalculating = true;
+		private bool IsInitialized = false;
+		private bool IsCalculating = false;
 		
-		// Can be optimized!
-		((char, int) p1, (char, int) p2) positions = board.FindFieldsWithPlayer(onTurn);
-
-		if
-		(
-			board.FindAdjacentFields(positions.p1, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0
-			&&
-			board.FindAdjacentFields(positions.p2, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0
-		)
+		void Awake()
 		{
+			board = GameObject.FindGameObjectWithTag("Board").GetComponent<Board>();
+		}
+
+		void Start()
+		{
+			var loader = SceneLocalCache.GetLoader<GameSceneLoader>("game");
+
+			if (loader == null)
+			{
+				UI.Status = "Status:\r\nUnable to load scene properly";
+				return;
+			}
+
+			if (!loader.LoadGame)
+			{
+				// Warning: boxing
+				player1 = (Player)System.Activator.CreateInstance(System.Type.GetType(loader.Player1Class), 1);
+				player2 = (Player)System.Activator.CreateInstance(System.Type.GetType(loader.Player2Class), 2);
+				gameLog.PlayerTypes(player1.GetType().FullName, player2.GetType().FullName);
+
+				StartGame();
+			}
+			else LoadGame(loader);
+		}
+
+		async void StartGame()
+		{
+			UI.Player1 += '[' + player1.Description + ']';
+			UI.Player2 += '[' + player2.Description + ']';
+
+			UI.Status = $"Status:\r\nPlayer{player1.No} placing 1. figure";
+			(char row, int col) position11 = await player1.PlaceFigure();
+			board.PlaceFigure(position11.row, position11.col, player1Object, player1);
+
+			UI.Status = $"Status:\r\nPlayer{player1.No} placing 2. figure";
+			(char row, int col) position12 = await player1.PlaceFigure();
+			board.PlaceFigure(position12.row, position12.col, player1Object, player1);
+
+			if (!player1.IsAutoPlaying) gameLog.Placement(position11, position12);
+
+			UI.Status = $"Status:\r\nPlayer{player2.No} placing 1. figure";
+			(char row, int col) position21 = await player2.PlaceFigure();
+			board.PlaceFigure(position21.row, position21.col, player2Object, player2);
+
+			UI.Status = $"Status:\r\nPlayer{player2.No} placing 2. figure";
+			(char row, int col) position22 = await player2.PlaceFigure();
+			board.PlaceFigure(position22.row, position22.col, player2Object, player2);
+
+			if (!player2.IsAutoPlaying) gameLog.Placement(position21, position22);
+
+			onTurn = player1;
+			IsInitialized = true;
+		}
+
+		void LoadGame(GameSceneLoader loader)
+		{
+			gameLog.Load(loader.SaveGamePath);
+			var autoplayer = new AutoPlayer(gameLog);
+			player1 = autoplayer.Player1;
+			player2 = autoplayer.Player2;
+			StartGame();
+		}
+
+		async void Update()
+		{
+			if (Input.GetKeyDown(KeyCode.Escape))
+			{
+				if (File.Exists(Config.SAVE_GAME_FILE)) File.Delete(Config.SAVE_GAME_FILE);
+				if (IsInitialized) gameLog.Save(Config.SAVE_GAME_FILE);
+				SceneManager.LoadScene("menu");
+			}
+
+			if (!IsInitialized || IsCalculating) return;
+			IsCalculating = true;
+
+			onTurn.CheckAutoPlayer();
+			
+			// Can be optimized!
+			((char, int) p1, (char, int) p2) positions = board.FindFieldsWithPlayer(onTurn);
+
+			if
+			(
+				board.FindAdjacentFields(positions.p1, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0
+				&&
+				board.FindAdjacentFields(positions.p2, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0
+			)
+			{
+				onTurn = onTurn == player1 ? player2 : player1;
+				UI.Status = "Status:\r\nGame end";
+				UI.Outcome = $"Player{onTurn.No} wins!";
+				IsInitialized = false;
+				goto ret;
+			}
+
+			await onTurn.PrepareTurn();
+
+			UI.Status = $"Status:\r\nPlayer{onTurn.No} selecting figure";
+			(char row, int col) playerFrom;
+			do playerFrom = await onTurn.SelectFigure(positions.p1, positions.p2); while (board[playerFrom.row, playerFrom.col].Standing != onTurn);
+
+			UI.Status = $"Status:\r\nPlayer{onTurn.No} moving figure";
+			var allowedMovements = board.FindAdjacentFields(playerFrom, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true);
+			(char row, int col) moveTo;
+			do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains(board[moveTo.row, moveTo.col]) && (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col));
+			if (playerFrom.row == moveTo.row && playerFrom.col == moveTo.col) goto ret;
+			board.MoveFigure(playerFrom, moveTo);
+
+			if (board[moveTo.row, moveTo.col].Level == Building.TILES_COUNT - 1)
+			{
+				UI.Status = "Status:\r\nGame end";
+				UI.Outcome = $"Player{onTurn.No} wins!";
+				IsInitialized = false;
+				goto ret;
+			}
+
+			UI.Status = $"Status:\r\nPlayer{onTurn.No} building";
+			var allowedBuildings = board.FindAdjacentFields(moveTo, constrainLevels: false, constrainBlockedOrFilled: true, constrainSelf: true);
+			(char row, int col) buildOn;
+			do buildOn = await onTurn.BuildOn(moveTo, allowedBuildings); while (!allowedBuildings.Contains(board[buildOn.row, buildOn.col]));
+			board[buildOn.row, buildOn.col].Build();
+
+			if (!onTurn.IsAutoPlaying) gameLog.Turn(playerFrom, moveTo, buildOn);
+
 			onTurn = onTurn == player1 ? player2 : player1;
-			UI.Status = "Status:\r\nGame end";
-			UI.Outcome = $"Player{onTurn.No} wins!";
-			IsInitialized = false;
-			goto ret;
+
+		ret:
+			IsCalculating = false;
 		}
-
-		UI.Status = $"Status:\r\nPlayer{onTurn.No} selecting figure";
-		(char row, int col) playerFrom;
-		do playerFrom = await onTurn.SelectFigure(positions.p1, positions.p2); while (board[playerFrom.row, playerFrom.col].Standing != onTurn);
-
-		UI.Status = $"Status:\r\nPlayer{onTurn.No} moving figure";
-		var allowedMovements = board.FindAdjacentFields(playerFrom, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true);
-		(char row, int col) moveTo;
-		do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains(board[moveTo.row, moveTo.col]) && (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col));
-		if (playerFrom.row == moveTo.row && playerFrom.col == moveTo.col) goto ret;
-		board.MoveFigure(playerFrom, moveTo);
-
-		if (board[moveTo.row, moveTo.col].Level == Building.TILES_COUNT - 1)
-		{
-			UI.Status = "Status:\r\nGame end";
-			UI.Outcome = $"Player{onTurn.No} wins!";
-			IsInitialized = false;
-			goto ret;
-		}
-
-		UI.Status = $"Status:\r\nPlayer{onTurn.No} building";
-		var allowedBuildings = board.FindAdjacentFields(moveTo, constrainLevels: false, constrainBlockedOrFilled: true, constrainSelf: true);
-		(char row, int col) buildOn;
-		do buildOn = await onTurn.BuildOn(moveTo, allowedBuildings); while (!allowedBuildings.Contains(board[buildOn.row, buildOn.col]));
-		board[buildOn.row, buildOn.col].Build();
-
-		onTurn = onTurn == player1 ? player2 : player1;
-
-	ret:
-		IsCalculating = false;
 	}
 }

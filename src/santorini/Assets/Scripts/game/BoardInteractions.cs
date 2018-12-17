@@ -4,105 +4,111 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-public class BoardInteractions : MonoBehaviour
+namespace etf.santorini.sv150155d.game
 {
-	private Board board = null;
+	using logic;
+	using util;
 
-	private Camera mainCamera = null;
-	private (GameObject obj, Material mat, Color col) lastField = (null, null, default(Color));
-
-	private readonly SemaphoreSlim mutex = new SemaphoreSlim(1, 1);
-	private readonly SemaphoreSlim interactor = new SemaphoreSlim(0, 1);
-	private bool interact = false;
-	private Func<Field, bool> filter = null;
-	public (char, int) Position { get; private set; } = ('A', 1);
-
-	void Awake()
+	public sealed class BoardInteractions : MonoBehaviour
 	{
-		board = GameObject.FindGameObjectWithTag("Board").GetComponent<Board>();
-		mainCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<Camera>();
-	}
+		private Board board = null;
 
-	public async Task<(char, int)> StartInteracting(Func<Field, bool> filter = null)
-	{
-		mutex.Wait();
-		this.filter = filter;
-		interact = true;
+		private Camera mainCamera = null;
+		private (GameObject obj, Material mat, Color col) lastField = (null, null, default(Color));
 
-		return await Task.Run
-		(
-			() =>
-			{
-				interactor.Wait();
+		private readonly SemaphoreSlim mutex = new SemaphoreSlim(1, 1);
+		private readonly SemaphoreSlim interactor = new SemaphoreSlim(0, 1);
+		private bool interact = false;
+		private Func<Field, bool> filter = null;
+		public (char, int) Position { get; private set; } = ('A', 1);
 
-				interact = false;
-				this.filter = null;
-				mutex.Release();
-
-				return Position;
-			}
-		);
-	}
-
-	public void ShowPossibleOptions(List<Field> adjacentFields)
-	{
-		for (var i = 0; i < adjacentFields.Count; ++i)
+		void Awake()
 		{
-			var obj = adjacentFields[i].ActiveObject;
-			obj.GetComponent<Renderer>().material.SetColor("_Color", new Color(.102f, .373f, .576f));
+			board = GameObject.FindGameObjectWithTag("Board").GetComponent<Board>();
+			mainCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<Camera>();
 		}
-	}
 
-	public void ClearPossibleOptions(List<Field> adjacentFields)
-	{
-		for (var i = 0; i < adjacentFields.Count; ++i)
+		public async Task<(char, int)> StartInteracting(Func<Field, bool> filter = null)
 		{
-			var obj = adjacentFields[i].ActiveObject;
-			var building = obj.FindObjectBuilding();
-			if (building == null) obj.GetComponent<Renderer>().material.SetColor("_Color", Color.white);
-			else building.GetComponent<Building>().UpdateGraphics();
+			mutex.Wait();
+			this.filter = filter;
+			interact = true;
+
+			return await Task.Run
+			(
+				() =>
+				{
+					interactor.Wait();
+
+					interact = false;
+					this.filter = null;
+					mutex.Release();
+
+					return Position;
+				}
+			);
 		}
-	}
 
-	void Update()
-	{
-		if (!interact) return;
-
-		GameObject field = null;
-
-		if (Physics.Raycast(mainCamera.ScreenPointToRay(Input.mousePosition), out var hitObject))
+		public void ShowPossibleOptions(List<Field> adjacentFields)
 		{
-			field = hitObject.transform.gameObject.FindObjectField();
-
-			if (field != null && Input.GetMouseButtonDown(0))
+			for (var i = 0; i < adjacentFields.Count; ++i)
 			{
-				// Hack :)))
-				Position = (field.name[0], field.name[1] - '0');
-
-				interactor.Release();
-				field = null;
+				var obj = adjacentFields[i].ActiveObject;
+				obj.GetComponent<Renderer>().material.SetColor("_Color", new Color(.102f, .373f, .576f));
 			}
 		}
 
-		if (field == lastField.obj || field == null && lastField.obj == null) return;
-
-		if (lastField.obj != null)
+		public void ClearPossibleOptions(List<Field> adjacentFields)
 		{
-			// Mouse Leave
-			lastField.mat.SetColor("_Color", lastField.col);
-			lastField = (null, null, default(Color));
+			for (var i = 0; i < adjacentFields.Count; ++i)
+			{
+				var obj = adjacentFields[i].ActiveObject;
+				var building = obj.FindObjectBuilding();
+				if (building == null) obj.GetComponent<Renderer>().material.SetColor("_Color", Color.white);
+				else building.GetComponent<Building>().UpdateGraphics();
+			}
 		}
 
-		if (field != null)
+		void Update()
 		{
-			// Mouse Enter
-			if (!field.GetComponent<Field>().IsBlocked && (filter == null || filter(field.GetComponent<Field>())))
+			if (!interact) return;
+
+			GameObject field = null;
+
+			if (Physics.Raycast(mainCamera.ScreenPointToRay(Input.mousePosition), out var hitObject))
 			{
-				var obj = field.GetComponent<Field>().ActiveObject;
-				var material = obj.GetComponent<Renderer>().material;
-				var color = material.GetColor("_Color");
-				material.SetColor("_Color", Color.gray);
-				lastField = (field, material, color);
+				field = hitObject.transform.gameObject.FindObjectField();
+
+				if (field != null && Input.GetMouseButtonDown(0))
+				{
+					// Hack :)))
+					Position = (field.name[0], field.name[1] - '0');
+
+					interactor.Release();
+					field = null;
+				}
+			}
+
+			if (field == lastField.obj || field == null && lastField.obj == null) return;
+
+			if (lastField.obj != null)
+			{
+				// Mouse Leave
+				lastField.mat.SetColor("_Color", lastField.col);
+				lastField = (null, null, default(Color));
+			}
+
+			if (field != null)
+			{
+				// Mouse Enter
+				if (!field.GetComponent<Field>().IsBlocked && (filter == null || filter(field.GetComponent<Field>())))
+				{
+					var obj = field.GetComponent<Field>().ActiveObject;
+					var material = obj.GetComponent<Renderer>().material;
+					var color = material.GetColor("_Color");
+					material.SetColor("_Color", Color.gray);
+					lastField = (field, material, color);
+				}
 			}
 		}
 	}

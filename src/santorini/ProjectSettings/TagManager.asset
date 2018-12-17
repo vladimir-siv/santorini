@@ -9,6 +9,8 @@ TagManager:
   - Building
   - UI-StatusText
   - UI-OutcomeText
+  - UI-Player1Text
+  - UI-Player2Text
   layers:
   - Default
   - TransparentFX
