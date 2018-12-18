@@ -11,6 +11,7 @@ TagManager:
   - UI-OutcomeText
   - UI-Player1Text
   - UI-Player2Text
+  - UI-Menu
   layers:
   - Default
   - TransparentFX

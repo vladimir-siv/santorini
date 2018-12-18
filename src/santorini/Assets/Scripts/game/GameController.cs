@@ -16,7 +16,7 @@ namespace etf.santorini.sv150155d.game
 		public GameObject player1Object;
 		public GameObject player2Object;
 
-		private GameLog gameLog = new GameLog();
+		private readonly GameLog gameLog = new GameLog();
 
 		private Board board = null;
 
@@ -42,6 +42,8 @@ namespace etf.santorini.sv150155d.game
 				return;
 			}
 
+			UI.Init();
+
 			if (!loader.LoadGame)
 			{
 				// Warning: boxing
@@ -60,21 +62,25 @@ namespace etf.santorini.sv150155d.game
 			UI.Player2 += '[' + player2.Description + ']';
 
 			UI.Status = $"Status:\r\nPlayer{player1.No} placing 1. figure";
-			(char row, int col) position11 = await player1.PlaceFigure();
+			(char row, int col) position11;
+			do position11 = await player1.PlaceFigure(); while (board[position11.row, position11.col].Standing != null);
 			board.PlaceFigure(position11.row, position11.col, player1Object, player1);
 
 			UI.Status = $"Status:\r\nPlayer{player1.No} placing 2. figure";
-			(char row, int col) position12 = await player1.PlaceFigure();
+			(char row, int col) position12;
+			do position12 = await player1.PlaceFigure(); while (board[position12.row, position12.col].Standing != null);
 			board.PlaceFigure(position12.row, position12.col, player1Object, player1);
 
 			if (!player1.IsAutoPlaying) gameLog.Placement(position11, position12);
 
 			UI.Status = $"Status:\r\nPlayer{player2.No} placing 1. figure";
-			(char row, int col) position21 = await player2.PlaceFigure();
+			(char row, int col) position21;
+			do position21 = await player2.PlaceFigure(); while (board[position21.row, position21.col].Standing != null);
 			board.PlaceFigure(position21.row, position21.col, player2Object, player2);
 
 			UI.Status = $"Status:\r\nPlayer{player2.No} placing 2. figure";
-			(char row, int col) position22 = await player2.PlaceFigure();
+			(char row, int col) position22;
+			do position22 = await player2.PlaceFigure(); while (board[position22.row, position22.col].Standing != null);
 			board.PlaceFigure(position22.row, position22.col, player2Object, player2);
 
 			if (!player2.IsAutoPlaying) gameLog.Placement(position21, position22);
@@ -109,12 +115,10 @@ namespace etf.santorini.sv150155d.game
 			// Can be optimized!
 			((char, int) p1, (char, int) p2) positions = board.FindFieldsWithPlayer(onTurn);
 
-			if
-			(
-				board.FindAdjacentFields(positions.p1, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0
-				&&
-				board.FindAdjacentFields(positions.p2, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0
-			)
+			bool p1Blocked = board.FindAdjacentFields(positions.p1, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0;
+			bool p2Blocked = board.FindAdjacentFields(positions.p2, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0;
+
+			if (p1Blocked && p2Blocked)
 			{
 				onTurn = onTurn == player1 ? player2 : player1;
 				UI.Status = "Status:\r\nGame end";
@@ -127,12 +131,14 @@ namespace etf.santorini.sv150155d.game
 
 			UI.Status = $"Status:\r\nPlayer{onTurn.No} selecting figure";
 			(char row, int col) playerFrom;
-			do playerFrom = await onTurn.SelectFigure(positions.p1, positions.p2); while (board[playerFrom.row, playerFrom.col].Standing != onTurn);
+			if (p1Blocked) playerFrom = positions.p2;
+			else if (p2Blocked) playerFrom = positions.p1;
+			else do playerFrom = await onTurn.SelectFigure(positions.p1, positions.p2); while (board[playerFrom.row, playerFrom.col].Standing != onTurn);
 
 			UI.Status = $"Status:\r\nPlayer{onTurn.No} moving figure";
 			var allowedMovements = board.FindAdjacentFields(playerFrom, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true);
 			(char row, int col) moveTo;
-			do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains(board[moveTo.row, moveTo.col]) && (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col));
+			do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains(board[moveTo.row, moveTo.col]) && ((p1Blocked || p2Blocked) || (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col)));
 			if (playerFrom.row == moveTo.row && playerFrom.col == moveTo.col) goto ret;
 			board.MoveFigure(playerFrom, moveTo);
 

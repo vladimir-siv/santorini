@@ -7,8 +7,6 @@ namespace etf.santorini.sv150155d.scenes
 	{
 		private static IDictionary<string, Stack<SceneLoader>> sceneCache = new Dictionary<string, Stack<SceneLoader>>();
 
-		public static void Touch() { }
-
 		static SceneLocalCache()
 		{
 			SceneManager.sceneLoaded += OnSceneLoaded;
@@ -17,7 +15,7 @@ namespace etf.santorini.sv150155d.scenes
 
 		private static void OnSceneLoaded(Scene scene, LoadSceneMode loadSceneMode)
 		{
-		
+			
 		}
 
 		private static void OnSceneUnloaded(Scene scene)
