@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Text;
 
 namespace etf.santorini.sv150155d.players
 {
 	using ioc;
-	using game;
 
 	public abstract class Player
 	{
@@ -32,7 +32,7 @@ namespace etf.santorini.sv150155d.players
 		public virtual int No { get; protected set; } = 0;
 		private AutoPlayer AutoPlayer { get; set; } = null;
 		public bool IsAutoPlaying => AutoPlayer != null;
-
+		
 		protected Player(int No) : this(No, null)
 		{
 
@@ -49,18 +49,68 @@ namespace etf.santorini.sv150155d.players
 			}
 		}
 
+		public string Serialize()
+		{
+			var type = GetType();
+
+			StringBuilder sb = new StringBuilder();
+			sb.Append(type.FullName);
+			sb.Append(';');
+			sb.Append(No);
+
+			var initializer = FindInitializer(type);
+			foreach (var parameter in initializer.GetParameters())
+			{
+				sb.Append(';');
+				sb.Append(parameter);
+				sb.Append('=');
+				sb.Append(initializer[parameter]);
+			}
+
+			return sb.ToString();
+		}
+
+		public static (Type type, int no) Deserialize(string log)
+		{
+			var split = log.Split(new string[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
+
+			var type = Type.GetType(split[0]);
+			var no = Convert.ToInt32(split[1]);
+
+			var initializer = FindInitializer(type);
+			for (var i = 2; i < split.Length; ++i)
+			{
+				var arg = split[i].Split('=');
+				if (arg.Length == 2)
+				{
+					initializer[arg[0]] = arg[1];
+				}
+			}
+
+			return (type, no);
+		}
+
 		public virtual void OnPlayerInitialize(InjectionParser initializer)
 		{
 
 		}
 
-		public virtual async Task<(char, int)> PlaceFigure()
-		{
-			return await AutoPlayer.PlaceFigure();
-		}
 		public void CheckAutoPlayer()
 		{
 			if (IsAutoPlaying && !AutoPlayer.HasMore) AutoPlayer = null;
+		}
+
+		public virtual async Task PreparePlacement()
+		{
+			await AutoPlayer.PreparePlacement();
+		}
+		public virtual async Task<(char, int)> PlaceFigure1()
+		{
+			return await AutoPlayer.PlaceFigure1();
+		}
+		public virtual async Task<(char, int)> PlaceFigure2()
+		{
+			return await AutoPlayer.PlaceFigure2();
 		}
 		public virtual async Task PrepareTurn()
 		{
@@ -70,11 +120,11 @@ namespace etf.santorini.sv150155d.players
 		{
 			return await AutoPlayer.SelectFigure(p1, p2);
 		}
-		public virtual async Task<(char, int)> MoveFigure((char row, int col) playerPosition, List<Field> allowedMovements)
+		public virtual async Task<(char, int)> MoveFigure((char row, int col) playerPosition, List<(char row, int col)> allowedMovements)
 		{
 			return await AutoPlayer.MoveFigure(playerPosition, allowedMovements);
 		}
-		public virtual async Task<(char, int)> BuildOn((char row, int col) playerPosition, List<Field> allowedBuildings)
+		public virtual async Task<(char, int)> BuildOn((char row, int col) playerPosition, List<(char row, int col)> allowedBuildings)
 		{
 			return await AutoPlayer.BuildOn(playerPosition, allowedBuildings);
 		}

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -13,6 +14,8 @@ namespace etf.santorini.sv150155d.game
 
 	public sealed class GameController : MonoBehaviour
 	{
+		public static GameController CurrentReference { get; private set; }
+
 		public GameObject player1Object;
 		public GameObject player2Object;
 
@@ -26,9 +29,15 @@ namespace etf.santorini.sv150155d.game
 
 		private bool IsInitialized = false;
 		private bool IsCalculating = false;
+
+		public Player FirstPlayer => player1;
+		public Player SecondPlayer => player2;
+		public Player OnTurn => onTurn;
 		
 		void Awake()
 		{
+			CurrentReference = this;
+			SceneManager.sceneUnloaded += scene => CurrentReference = scene.name == "game" ? null : CurrentReference;
 			board = GameObject.FindGameObjectWithTag("Board").GetComponent<Board>();
 		}
 
@@ -47,9 +56,9 @@ namespace etf.santorini.sv150155d.game
 			if (!loader.LoadGame)
 			{
 				// Warning: boxing
-				player1 = (Player)System.Activator.CreateInstance(System.Type.GetType(loader.Player1Class), 1);
-				player2 = (Player)System.Activator.CreateInstance(System.Type.GetType(loader.Player2Class), 2);
-				gameLog.PlayerTypes(player1.GetType().FullName, player2.GetType().FullName);
+				player1 = (Player)Activator.CreateInstance(Type.GetType(loader.Player1Class), 1);
+				player2 = (Player)Activator.CreateInstance(Type.GetType(loader.Player2Class), 2);
+				gameLog.Players(player1.Serialize(), player2.Serialize());
 
 				StartGame();
 			}
@@ -58,29 +67,37 @@ namespace etf.santorini.sv150155d.game
 
 		async void StartGame()
 		{
+			BoardProxy.Reference.Set(board);
+
 			UI.Player1 += '[' + player1.Description + ']';
 			UI.Player2 += '[' + player2.Description + ']';
 
+			onTurn = player1;
+			await player1.PreparePlacement();
+
 			UI.Status = $"Status:\r\nPlayer{player1.No} placing 1. figure";
 			(char row, int col) position11;
-			do position11 = await player1.PlaceFigure(); while (board[position11.row, position11.col].Standing != null);
+			do position11 = await player1.PlaceFigure1(); while (board[position11.row, position11.col].Standing != null);
 			board.PlaceFigure(position11.row, position11.col, player1Object, player1);
 
 			UI.Status = $"Status:\r\nPlayer{player1.No} placing 2. figure";
 			(char row, int col) position12;
-			do position12 = await player1.PlaceFigure(); while (board[position12.row, position12.col].Standing != null);
+			do position12 = await player1.PlaceFigure2(); while (board[position12.row, position12.col].Standing != null);
 			board.PlaceFigure(position12.row, position12.col, player1Object, player1);
 
 			if (!player1.IsAutoPlaying) gameLog.Placement(position11, position12);
 
+			onTurn = player2;
+			await player2.PreparePlacement();
+
 			UI.Status = $"Status:\r\nPlayer{player2.No} placing 1. figure";
 			(char row, int col) position21;
-			do position21 = await player2.PlaceFigure(); while (board[position21.row, position21.col].Standing != null);
+			do position21 = await player2.PlaceFigure1(); while (board[position21.row, position21.col].Standing != null);
 			board.PlaceFigure(position21.row, position21.col, player2Object, player2);
 
 			UI.Status = $"Status:\r\nPlayer{player2.No} placing 2. figure";
 			(char row, int col) position22;
-			do position22 = await player2.PlaceFigure(); while (board[position22.row, position22.col].Standing != null);
+			do position22 = await player2.PlaceFigure2(); while (board[position22.row, position22.col].Standing != null);
 			board.PlaceFigure(position22.row, position22.col, player2Object, player2);
 
 			if (!player2.IsAutoPlaying) gameLog.Placement(position21, position22);
@@ -112,7 +129,6 @@ namespace etf.santorini.sv150155d.game
 
 			onTurn.CheckAutoPlayer();
 			
-			// Can be optimized!
 			((char, int) p1, (char, int) p2) positions = board.FindFieldsWithPlayer(onTurn);
 
 			bool p1Blocked = board.FindAdjacentFields(positions.p1, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true).Count == 0;
@@ -127,6 +143,7 @@ namespace etf.santorini.sv150155d.game
 				goto ret;
 			}
 
+			board.PrepareTurn(onTurn);
 			await onTurn.PrepareTurn();
 
 			UI.Status = $"Status:\r\nPlayer{onTurn.No} selecting figure";
@@ -138,7 +155,7 @@ namespace etf.santorini.sv150155d.game
 			UI.Status = $"Status:\r\nPlayer{onTurn.No} moving figure";
 			var allowedMovements = board.FindAdjacentFields(playerFrom, constrainLevels: true, constrainBlockedOrFilled: true, constrainSelf: true);
 			(char row, int col) moveTo;
-			do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains(board[moveTo.row, moveTo.col]) && ((p1Blocked || p2Blocked) || (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col)));
+			do moveTo = await onTurn.MoveFigure(playerFrom, allowedMovements); while (!allowedMovements.Contains((moveTo.row, moveTo.col)) && ((p1Blocked || p2Blocked) || (playerFrom.row != moveTo.row || playerFrom.col != moveTo.col)));
 			if (playerFrom.row == moveTo.row && playerFrom.col == moveTo.col) goto ret;
 			board.MoveFigure(playerFrom, moveTo);
 
@@ -153,8 +170,8 @@ namespace etf.santorini.sv150155d.game
 			UI.Status = $"Status:\r\nPlayer{onTurn.No} building";
 			var allowedBuildings = board.FindAdjacentFields(moveTo, constrainLevels: false, constrainBlockedOrFilled: true, constrainSelf: true);
 			(char row, int col) buildOn;
-			do buildOn = await onTurn.BuildOn(moveTo, allowedBuildings); while (!allowedBuildings.Contains(board[buildOn.row, buildOn.col]));
-			board[buildOn.row, buildOn.col].Build();
+			do buildOn = await onTurn.BuildOn(moveTo, allowedBuildings); while (!allowedBuildings.Contains((buildOn.row, buildOn.col)));
+			board.Build(buildOn.row, buildOn.col);
 
 			if (!onTurn.IsAutoPlaying) gameLog.Turn(playerFrom, moveTo, buildOn);
 

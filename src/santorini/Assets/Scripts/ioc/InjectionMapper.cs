@@ -3,20 +3,28 @@
 namespace etf.santorini.sv150155d.ioc
 {
 	using players;
+	using ai;
 
 	public static class InjectionMapper
 	{
 		static InjectionMapper()
 		{
-			InjectionParser initializer = null;
-
 			Player.MapInitializer<Human>(InjectionParser.Empty);
 
-			initializer = new InjectionParser(new[] { "alpha-beta", "optimized", "level" });
+			Player.MapInitializer<Dummy>(InjectionParser.Empty);
+
+			var initializer = new InjectionParser("alpha-beta", "optimized", "level", "estimation");
 			initializer.MapParser("alpha-beta", Convert.ToBoolean);
 			initializer.MapParser("optimized", Convert.ToBoolean);
 			initializer.MapParser("level", Convert.ToInt32);
-			Player.MapInitializer<DummyPlayer>(initializer);
+			initializer.MapParser("estimation", Estimator.Convert);
+			initializer.MapChoices("estimation", new string[]
+			{
+				typeof(Easy).FullName,
+				typeof(Medium).FullName,
+				typeof(Hard).FullName
+			});
+			Player.MapInitializer<MiniMax>(initializer);
 		}
 
 		public static void Initialize()

@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 
 namespace etf.santorini.sv150155d.players
 {
-	using game;
 	using logging;
 
 	public sealed class AutoPlayer : Player
@@ -22,9 +21,12 @@ namespace etf.santorini.sv150155d.players
 			{
 				var logs = gameLog.Present;
 
+				var player1 = Deserialize(logs[0]);
+				var player2 = Deserialize(logs[1]);
+
 				// Warning: boxing
-				Player1 = (Player)System.Activator.CreateInstance(System.Type.GetType(logs[0]), 1, this);
-				Player2 = (Player)System.Activator.CreateInstance(System.Type.GetType(logs[1]), 2, this);
+				Player1 = (Player)Activator.CreateInstance(player1.type, player1.no, this);
+				Player2 = (Player)Activator.CreateInstance(player2.type, player2.no, this);
 				
 				for (var i = 2; i < logs.Length; ++i)
 				{
@@ -60,7 +62,17 @@ namespace etf.santorini.sv150155d.players
 			return (current[0], current[1] - '0');
 		}
 
-		public override async Task<(char, int)> PlaceFigure()
+		public override async Task PreparePlacement()
+		{
+			await Task.CompletedTask;
+		}
+
+		public override async Task<(char, int)> PlaceFigure1()
+		{
+			return await Task.FromResult(GetNextToken());
+		}
+
+		public override async Task<(char, int)> PlaceFigure2()
 		{
 			return await Task.FromResult(GetNextToken());
 		}
@@ -75,12 +87,12 @@ namespace etf.santorini.sv150155d.players
 			return await Task.FromResult(GetNextToken());
 		}
 
-		public override async Task<(char, int)> MoveFigure((char row, int col) playerPosition, List<Field> allowedMovements)
+		public override async Task<(char, int)> MoveFigure((char row, int col) playerPosition, List<(char row, int col)> allowedMovements)
 		{
 			return await Task.FromResult(GetNextToken());
 		}
 
-		public override async Task<(char, int)> BuildOn((char row, int col) playerPosition, List<Field> allowedBuildings)
+		public override async Task<(char, int)> BuildOn((char row, int col) playerPosition, List<(char row, int col)> allowedBuildings)
 		{
 			return await Task.FromResult(GetNextToken());
 		}

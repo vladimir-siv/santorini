@@ -19,7 +19,7 @@ namespace etf.santorini.sv150155d.game
 		private readonly SemaphoreSlim mutex = new SemaphoreSlim(1, 1);
 		private readonly SemaphoreSlim interactor = new SemaphoreSlim(0, 1);
 		private bool interact = false;
-		private Func<Field, bool> filter = null;
+		private Func<(char, int), bool> filter = null;
 		public (char, int) Position { get; private set; } = ('A', 1);
 
 		void Awake()
@@ -28,7 +28,7 @@ namespace etf.santorini.sv150155d.game
 			mainCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<Camera>();
 		}
 
-		public async Task<(char, int)> StartInteracting(Func<Field, bool> filter = null)
+		public async Task<(char, int)> StartInteracting(Func<(char row, int col), bool> filter = null)
 		{
 			mutex.Wait();
 			this.filter = filter;
@@ -49,20 +49,22 @@ namespace etf.santorini.sv150155d.game
 			);
 		}
 
-		public void ShowPossibleOptions(List<Field> adjacentFields)
+		public void ShowPossibleOptions(List<(char row, int col)> adjacentFields)
 		{
 			for (var i = 0; i < adjacentFields.Count; ++i)
 			{
-				var obj = adjacentFields[i].ActiveObject;
+				var field = adjacentFields[i];
+				var obj = board[field.row, field.col].ActiveObject;
 				obj.GetComponent<Renderer>().material.SetColor("_Color", new Color(.102f, .373f, .576f));
 			}
 		}
 
-		public void ClearPossibleOptions(List<Field> adjacentFields)
+		public void ClearPossibleOptions(List<(char row, int col)> adjacentFields)
 		{
 			for (var i = 0; i < adjacentFields.Count; ++i)
 			{
-				var obj = adjacentFields[i].ActiveObject;
+				var field = adjacentFields[i];
+				var obj = board[field.row, field.col].ActiveObject;
 				var building = obj.FindObjectBuilding();
 				if (building == null) obj.GetComponent<Renderer>().material.SetColor("_Color", Color.white);
 				else building.GetComponent<Building>().UpdateGraphics();
@@ -79,13 +81,16 @@ namespace etf.santorini.sv150155d.game
 			{
 				field = hitObject.transform.gameObject.FindObjectField();
 
-				if (field != null && Input.GetMouseButtonDown(0))
+				if (field != null)
 				{
 					// Hack :)))
 					Position = (field.name[0], field.name[1] - '0');
 
-					interactor.Release();
-					field = null;
+					if (Input.GetMouseButtonDown(0))
+					{
+						interactor.Release();
+						field = null;
+					}
 				}
 			}
 
@@ -101,7 +106,7 @@ namespace etf.santorini.sv150155d.game
 			if (field != null)
 			{
 				// Mouse Enter
-				if (!field.GetComponent<Field>().IsBlocked && (filter == null || filter(field.GetComponent<Field>())))
+				if (!field.GetComponent<Field>().IsBlocked && (filter == null || filter(Position)))
 				{
 					var obj = field.GetComponent<Field>().ActiveObject;
 					var material = obj.GetComponent<Renderer>().material;

@@ -9,10 +9,10 @@ namespace etf.santorini.sv150155d.logging
 
 		public string[] Present => log.ToArray();
 
-		public void PlayerTypes(string player1Class, string player2Class)
+		public void Players(string player1, string player2)
 		{
-			log.Add(player1Class);
-			log.Add(player2Class);
+			log.Add(player1);
+			log.Add(player2);
 		}
 
 		public void Placement((char row, int col) figure1, (char row, int col) figure2)

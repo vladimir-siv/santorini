@@ -17,6 +17,7 @@ namespace etf.santorini.sv150155d.menu
 	public class MenuController : MonoBehaviour
 	{
 		public TMP_InputField inputField;
+		public TMP_Dropdown dropdown;
 		public Toggle toggle;
 
 		public GameObject mainMenuPnl;
@@ -152,6 +153,25 @@ namespace etf.santorini.sv150155d.menu
 					instance.GetComponentInChildren<Text>().text = parameter;
 					initialValues[parameter] = instance.isOn.ToString();
 					instance.onValueChanged.AddListener(value => initialValues[parameter] = value.ToString());
+					i = instance;
+				}
+				else if (initializer.ResolveChoices(parameter, out var choices))
+				{
+					var instance = Instantiate(this.dropdown);
+					var defaultInitialValue = choices[0];
+
+					if (choices != null)
+					{
+						for (var c = 0; c < choices.Length; ++c)
+						{
+							instance.options.Add(new TypedOptionData(Type.GetType(choices[c])));
+						}
+					}
+					
+					instance.value = 0;
+					instance.GetComponentInChildren<TextMeshProUGUI>().text = parameter;
+					initialValues[parameter] = defaultInitialValue;
+					instance.onValueChanged.AddListener(c => initialValues[parameter] = ((TypedOptionData)instance.options[c]).Type.FullName);
 					i = instance;
 				}
 				else

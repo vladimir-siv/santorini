@@ -9,10 +9,11 @@ namespace etf.santorini.sv150155d.ioc
 
 		private readonly IDictionary<string, string> parameters = new Dictionary<string, string>();
 		private readonly IDictionary<string, (Type t, object p)> parsers = new Dictionary<string, (Type, object)>();
+		private readonly IDictionary<string, string[]> choices = new Dictionary<string, string[]>();
 
 		public int Size { get; }
 
-		public InjectionParser(string[] parameters)
+		public InjectionParser(params string[] parameters)
 		{
 			for (var i = 0; i < parameters.Length; ++i)
 			{
@@ -43,6 +44,12 @@ namespace etf.santorini.sv150155d.ioc
 			parsers[parameter] = (typeof(T), parser);
 		}
 
+		public void MapChoices(string parameter, string[] choices)
+		{
+			if (!parsers.ContainsKey(parameter)) throw new IndexOutOfRangeException("Invalid parameter name");
+			this.choices[parameter] = choices;
+		}
+
 		public Type ResolveType(string parameter)
 		{
 			if (!parameters.ContainsKey(parameter)) throw new IndexOutOfRangeException("Invalid parameter name");
@@ -54,6 +61,14 @@ namespace etf.santorini.sv150155d.ioc
 			if (!parameters.ContainsKey(parameter)) throw new IndexOutOfRangeException("Invalid parameter name");
 			if (parsers[parameter].t != typeof(T)) throw new InvalidCastException("Parameter type does not match the parser type");
 			return ((Func<string, T>)parsers[parameter].p)(parameters[parameter]);
+		}
+
+		public bool ResolveChoices(string parameter, out string[] choices)
+		{
+			choices = null;
+			if (!this.choices.ContainsKey(parameter)) return false;
+			choices = this.choices[parameter];
+			return true;
 		}
 
 		public IEnumerable<string> GetParameters()
