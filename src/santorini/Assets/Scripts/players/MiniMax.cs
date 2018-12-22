@@ -26,7 +26,7 @@ namespace etf.santorini.sv150155d.players
 		private HashDAGraph<string, float?, Move> dag = new HashDAGraph<string, float?, Move>();
 		private List<string> lastLevel = new List<string>();
 		private List<string> clone = new List<string>();
-		private Stack<(HashCollection<string, float?, Move>.Node node, IEnumerator<HashCollection<string, float?, Move>.Node> i)> stack = new Stack<(HashCollection<string, float?, Move>.Node node, IEnumerator<HashCollection<string, float?, Move>.Node> i)>();
+		private Stack<(HashCollection<string, float?, Move>.Node node, IEnumerator<HashCollection<string, float?, Move>.Node> i, float alpha, float beta)> stack = new Stack<(HashCollection<string, float?, Move>.Node node, IEnumerator<HashCollection<string, float?, Move>.Node> i, float alpha, float beta)>();
 		
 		private (char row, int col) select;
 		private (char row, int col) move;
@@ -141,12 +141,10 @@ namespace etf.santorini.sv150155d.players
 
 			await Task.Run(() =>
 			{
-				float extractValue(string boardState, float? nodeValue, float? childValue)
+				float extractValue(int onTurn, float? nodeValue, float? childValue)
 				{
 					if (nodeValue != null)
 					{
-						// Hack to quickly get BoardState.OnTurn from string
-						var onTurn = Convert.ToInt32(boardState.Substring(boardState.LastIndexOf('|') + 1));
 						if (onTurn == No) return Math.Max((float)nodeValue, (float)childValue);
 						else return Math.Min((float)nodeValue, (float)childValue);
 					}
@@ -163,9 +161,11 @@ namespace etf.santorini.sv150155d.players
 
 				var me = this;
 				var opponent = GameController.CurrentReference.Opponent(this);
-
+				
 				HashCollection<string, float?, Move>.Node node = dag.Root;
 				IEnumerator<HashCollection<string, float?, Move>.Node> i = null;
+				float alpha = float.NegativeInfinity;
+				float beta = float.PositiveInfinity;
 				if (node != null)
 				{
 					node.Value = null;
@@ -176,7 +176,7 @@ namespace etf.santorini.sv150155d.players
 				{
 					while (node != null)
 					{
-						stack.Push((node, i));
+						stack.Push((node, i, alpha, beta));
 
 						node = i.Current;
 						if (node != null)
@@ -189,14 +189,23 @@ namespace etf.santorini.sv150155d.players
 
 					if (stack.Count > 0)
 					{
-						(node, i) = stack.Pop();
+						(node, i, alpha, beta) = stack.Pop();
+
+						// Hack to quickly get BoardState.OnTurn from string
+						var onTurn = Convert.ToInt32(node.Key.Substring(node.Key.LastIndexOf('|') + 1));
 
 						if (node.HashChildren)
 						{
-							node.Value = extractValue(node.Key, node.Value, i.Current.Value);
+							node.Value = extractValue(onTurn, node.Value, i.Current.Value);
+
+							if (alphabeta)
+							{
+								if (onTurn == No) alpha = (float)node.Value;
+								else beta = (float)node.Value;
+							}
 
 							// node = next;
-							if (!i.MoveNext()) node = null;
+							if (!i.MoveNext() || (alphabeta && alpha >= beta)) node = null;
 						}
 						else
 						{
@@ -211,7 +220,7 @@ namespace etf.santorini.sv150155d.players
 								clone.MoveFigure(possibility.from, possibility.to);
 								estimation += estimator.EstimateBuilding(me, opponent, clone, possibility.build);
 								clone.MoveFigure(possibility.to, possibility.from);
-								finalEstimation = extractValue(node.Key, finalEstimation, estimation);
+								finalEstimation = extractValue(onTurn, finalEstimation, estimation);
 							}
 
 							node.Value = finalEstimation;
@@ -234,7 +243,7 @@ namespace etf.santorini.sv150155d.players
 						select = bestMove.FromPosition;
 						move = bestMove.ToPosition;
 						build = bestMove.BuildOn;
-						return;
+						break;
 					}
 				}
 			});
