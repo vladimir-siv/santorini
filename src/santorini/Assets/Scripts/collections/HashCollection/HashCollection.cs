@@ -86,23 +86,40 @@ namespace etf.santorini.sv150155d.collections
 				
 				value.IsRoot = true;
 
-				if (root != null && !nodes.ContainsKey(value.Key))
+				if (root != null)
 				{
-					root.ClearChildren();
-					nodes.Remove(root.Key);
+					if (nodes.ContainsKey(value.Key))
+					{
+						root.ClearChildren();
+						nodes.Remove(root.Key);
+					}
+					else
+					{
+						root.IsRoot = false;
+						value.AddChild(root.Key);
+					}
 				}
 
 				root = value;
 			}
 		}
 
+		public int Count => nodes.Count;
 		public Node this[TKey key] => nodes[key];
-
+		
 		public abstract void Init(TKey key, TValue value = default);
 
 		public bool ContainsKey(TKey key)
 		{
 			return nodes.ContainsKey(key);
+		}
+
+		public IEnumerable<TKey> EnumerateKeys()
+		{
+			foreach (var key in nodes.Keys)
+			{
+				yield return key;
+			}
 		}
 	}
 }

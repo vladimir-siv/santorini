@@ -23,11 +23,11 @@ namespace etf.santorini.sv150155d.players
 		private int level = 0;
 		private IEstimator estimator = null;
 		
-		private HashDAGraph<string, float, Move> dag = new HashDAGraph<string, float, Move>();
+		private HashDAGraph<string, float?, Move> dag = new HashDAGraph<string, float?, Move>();
 		private List<string> lastLevel = new List<string>();
 		private List<string> clone = new List<string>();
-		private Stack<(HashCollection<string, float, Move>.Node node, int level)> stack = new Stack<(HashCollection<string, float, Move>.Node node, int level)>();
-
+		private Stack<(HashCollection<string, float?, Move>.Node node, IEnumerator<HashCollection<string, float?, Move>.Node> i)> stack = new Stack<(HashCollection<string, float?, Move>.Node node, IEnumerator<HashCollection<string, float?, Move>.Node> i)>();
+		
 		private (char row, int col) select;
 		private (char row, int col) move;
 		private (char row, int col) build;
@@ -39,7 +39,7 @@ namespace etf.santorini.sv150155d.players
 
 		private void Generate(string boardState, int levels)
 		{
-			if (levels < 2) levels = 2;
+			if (levels < 3) levels = 3;
 
 			var state = Pool<BoardState>.Create();
 
@@ -89,7 +89,7 @@ namespace etf.santorini.sv150155d.players
 
 			for (var i = 0; i < clone.Count; ++i)
 			{
-				Generate(clone[i], 2);
+				Generate(clone[i], 3);
 			}
 		}
 
@@ -141,68 +141,88 @@ namespace etf.santorini.sv150155d.players
 
 			await Task.Run(() =>
 			{
+				float extractValue(string boardState, float? nodeValue, float? childValue)
+				{
+					if (nodeValue != null)
+					{
+						// Hack to quickly get BoardState.OnTurn from string
+						var onTurn = Convert.ToInt32(boardState.Substring(boardState.LastIndexOf('|') + 1));
+						if (onTurn == No) return Math.Max((float)nodeValue, (float)childValue);
+						else return Math.Min((float)nodeValue, (float)childValue);
+					}
+					else return (float)childValue;
+				}
+
 				if (dag.Root == null) Sync();
 				else Resync();
 
 				stack.Clear();
-				
-				for (var enumerator = dag.EnumerateLevelOrder(dag.Root.Key); enumerator.IsValid; enumerator.Next())
-				{
-					stack.Push((enumerator.Node, enumerator.Level));
-				}
-
-				int lastLevel = -1;
 
 				var state = Pool<BoardState>.Create();
 				var clone = Pool<BoardState>.Create();
 
-				while (stack.Count > 0)
+				var me = this;
+				var opponent = GameController.CurrentReference.Opponent(this);
+
+				HashCollection<string, float?, Move>.Node node = dag.Root;
+				IEnumerator<HashCollection<string, float?, Move>.Node> i = null;
+				if (node != null)
 				{
-					var entry = stack.Pop();
-
-					if (lastLevel == -1) lastLevel = entry.level;
-
-					float? finalEstimation = null;
-
-					if (entry.level == lastLevel)
-					{
-						state.FromString(entry.node.Key);
-						clone.FromString(entry.node.Key);
-						
-						foreach (var possibility in state.PossibleOutcomes())
-						{
-							var estimation =
-								estimator.EstimateMoving(clone, possibility.from, possibility.to)
-								+
-								estimator.EstimateBuilding(clone, possibility.build);
-
-							if (finalEstimation != null)
-							{
-								if (clone.OnTurn == No) finalEstimation = Math.Max((float)finalEstimation, estimation);
-								else finalEstimation = Math.Min((float)finalEstimation, estimation);
-							}
-							else finalEstimation = estimation;
-						}
-
-					}
-					else
-					{
-						state.FromString(entry.node.Key);
-
-						foreach (var child in entry.node.EnumerateChildren())
-						{
-							if (finalEstimation != null)
-							{
-								if (clone.OnTurn == No) finalEstimation = Math.Max((float)finalEstimation, child.Value);
-								else finalEstimation = Math.Min((float)finalEstimation, child.Value);
-							}
-							else finalEstimation = child.Value;
-						}
-					}
-
-					entry.node.Value = (float)finalEstimation;
+					node.Value = null;
+					i = node.EnumerateChildren().GetEnumerator();
+					i.MoveNext();
 				}
+				while (true)
+				{
+					while (node != null)
+					{
+						stack.Push((node, i));
 
+						node = i.Current;
+						if (node != null)
+						{
+							node.Value = null;
+							i = node.EnumerateChildren().GetEnumerator();
+							i.MoveNext();
+						}
+					}
+
+					if (stack.Count > 0)
+					{
+						(node, i) = stack.Pop();
+
+						if (node.HashChildren)
+						{
+							node.Value = extractValue(node.Key, node.Value, i.Current.Value);
+
+							// node = next;
+							if (!i.MoveNext()) node = null;
+						}
+						else
+						{
+							float? finalEstimation = null;
+
+							state.FromString(node.Key);
+							clone.FromString(node.Key);
+
+							foreach (var possibility in state.PossibleOutcomes())
+							{
+								var estimation = estimator.EstimateMoving(me, opponent, clone, possibility.from, possibility.to);
+								clone.MoveFigure(possibility.from, possibility.to);
+								estimation += estimator.EstimateBuilding(me, opponent, clone, possibility.build);
+								clone.MoveFigure(possibility.to, possibility.from);
+								finalEstimation = extractValue(node.Key, finalEstimation, estimation);
+							}
+
+							node.Value = finalEstimation;
+							
+							// node = next;
+							node = null;
+						}
+					}
+					else break;
+				}
+				
 				Pool<BoardState>.Destroy(clone);
 				Pool<BoardState>.Destroy(state);
 

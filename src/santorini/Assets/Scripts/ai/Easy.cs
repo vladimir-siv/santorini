@@ -3,36 +3,38 @@
 namespace etf.santorini.sv150155d.ai
 {
 	using logic;
+	using players;
 
 	public class Easy : IEstimator
 	{
-		private float Estimate(BoardState state, (char row, int col) position)
+		private float Estimate(Player me, Player opponent, BoardState state, (char row, int col) position)
 		{
 			float m = state[position].level + 1f;
+			if (state.OnTurn == opponent.No) m *= -1;
 
 			float l = m + 1f;
 
-			var onTurn = state.FindFieldsWithPlayerOnTurn();
-			var notOnTurn = state.FindFieldsWithPlayerNotOnTurn();
+			var myPositions = state.FindFieldsWithPlayer(me);
+			var opponentPositions = state.FindFieldsWithPlayer(opponent);
 
 			float distance((char row, int col) from, (char row, int col) to) => Math.Max(Math.Abs(from.row - to.row), Math.Abs(from.col - to.col));
 
-			float onTurnDistance = Math.Min(distance(onTurn.p1, position), distance(onTurn.p2, position));
-			float notOnTurnDistance = Math.Min(distance(notOnTurn.p1, position), distance(notOnTurn.p2, position));
+			float myDistance = Math.Min(distance(myPositions.p1, position), distance(myPositions.p2, position));
+			float opponentDistance = Math.Min(distance(opponentPositions.p1, position), distance(opponentPositions.p2, position));
 
-			l *= notOnTurnDistance - onTurnDistance;
+			l *= opponentDistance - myDistance;
 
 			return m + l;
 		}
 
-		public float EstimateMoving(BoardState state, (char row, int col) from, (char row, int col) to)
+		public float EstimateMoving(Player me, Player opponent, BoardState state, (char row, int col) from, (char row, int col) to)
 		{
-			return Estimate(state, to);
+			return Estimate(me, opponent, state, to);
 		}
 
-		public float EstimateBuilding(BoardState state, (char row, int col) position)
+		public float EstimateBuilding(Player me, Player opponent, BoardState state, (char row, int col) position)
 		{
-			return Estimate(state, position);
+			return Estimate(me, opponent, state, position);
 		}
 	}
 }

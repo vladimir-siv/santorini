@@ -33,6 +33,12 @@ namespace etf.santorini.sv150155d.game
 		public Player FirstPlayer => player1;
 		public Player SecondPlayer => player2;
 		public Player OnTurn => onTurn;
+
+		public Player Opponent(Player player)
+		{
+			if (player == player1) return player2;
+			else return player1;
+		}
 		
 		void Awake()
 		{
@@ -143,6 +149,7 @@ namespace etf.santorini.sv150155d.game
 				goto ret;
 			}
 
+			UI.Status = $"Status:\r\nPlayer{onTurn.No} preparing";
 			board.PrepareTurn(onTurn);
 			await onTurn.PrepareTurn();
 
