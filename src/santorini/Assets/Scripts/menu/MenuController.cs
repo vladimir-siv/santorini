@@ -65,6 +65,9 @@ namespace etf.santorini.sv150155d.menu
 			player1Dropdown.value = 0;
 			player2Dropdown.value = 0;
 
+			Player1DropdownValueChange(0);
+			Player2DropdownValueChange(0);
+
 			player1Dropdown.RefreshShownValue();
 			player2Dropdown.RefreshShownValue();
 
@@ -109,7 +112,9 @@ namespace etf.santorini.sv150155d.menu
 			var loader = new GameSceneLoader
 			{
 				Player1Class = player1Type.FullName,
-				Player2Class = player2Type.FullName
+				Player2Class = player2Type.FullName,
+				Player1No = Config.Player1No,
+				Player2No = Config.Player2No
 			};
 			
 			foreach (var parameter in initialValues1) initializer1[parameter.Key] = parameter.Value;
@@ -127,20 +132,20 @@ namespace etf.santorini.sv150155d.menu
 
 		private void Player1DropdownValueChange(int index)
 		{
-			initializer1 = OnDropdownValueChange(player1Dropdown, player1PropPanel, initialValues1, index);
+			initializer1 = OnDropdownValueChange(player1Dropdown, player1PropPanel, initialValues1, Config.Player1No, index);
 		}
 
 		private void Player2DropdownValueChange(int index)
 		{
-			initializer2 = OnDropdownValueChange(player2Dropdown, player2PropPanel, initialValues2, index);
+			initializer2 = OnDropdownValueChange(player2Dropdown, player2PropPanel, initialValues2, Config.Player2No, index);
 		}
 
-		private InjectionParser OnDropdownValueChange(TMP_Dropdown dropdown, GameObject propPanel, IDictionary<string, string> initialValues, int index)
+		private InjectionParser OnDropdownValueChange(TMP_Dropdown dropdown, GameObject propPanel, IDictionary<string, string> initialValues, int playerNo, int index)
 		{
 			foreach (Transform child in propPanel.transform) Destroy(child.gameObject);
 			initialValues.Clear();
 
-			InjectionParser initializer = Player.FindInitializer(((TypedOptionData)dropdown.options[index]).Type);
+			InjectionParser initializer = Player.GenerateInitializer(((TypedOptionData)dropdown.options[index]).Type, playerNo.ToString());
 			int yposition = 40;
 
 			foreach (var parameter in initializer.GetParameters())

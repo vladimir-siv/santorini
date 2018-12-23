@@ -16,18 +16,25 @@ namespace etf.santorini.sv150155d.ui
 		Vector2 scrollPos;
 
 		private GameController controller = null;
+
+		private int? no = null;
+		private bool? alphabeta = null;
+		private bool? optimized = null;
+		private int? level = null;
+		private IEstimator estimator = null;
+		private float? threshold = null;
+
 		private (float? estimation, string move)? chosenMove = null;
 		private List<(float? estimation, string move)> nextMoves = new List<(float? estimation, string move)>();
 
 		[MenuItem("Santorini/AI Inspector")]
-		static void Init()
+		public static void Init()
 		{
 			AI_Inspector window = (AI_Inspector)EditorWindow.GetWindow(typeof(AI_Inspector));
 			window.minSize = new Vector2(300, 500);
 			window.maxSize = new Vector2(300, 500);
 			window.Show();
 			window.Refresh();
-
 			if (window.controller != null)
 			{
 				window.controller.OnWaitSpace -= window.OnSpace;
@@ -43,10 +50,18 @@ namespace etf.santorini.sv150155d.ui
 		
 		void OnGUI()
 		{
+			GUILayout.Label("    MiniMax Player Info", EditorStyles.boldLabel);
+			EditorGUILayout.LabelField("OnTurn:\t\t" + (no?.ToString() ?? "None"));
+			EditorGUILayout.LabelField("Alpha-Beta:\t" + alphabeta);
+			EditorGUILayout.LabelField("Optimized:\t\t" + optimized);
+			EditorGUILayout.LabelField("Level:\t\t" + level);
+			EditorGUILayout.LabelField("Estimator:\t\t" + estimator?.GetType().Name);
+			EditorGUILayout.LabelField("Threshold:\t\t" + threshold);
+
 			GUILayout.Label("    MiniMax DAG Inspector", EditorStyles.boldLabel);
 			EditorGUILayout.LabelField("Estimation:\tFrom -> To -> Build", EditorStyles.boldLabel);
 
-			scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(300), GUILayout.Height(440));
+			scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(300), GUILayout.Height(300));
 
 			if (chosenMove != null) EditorGUILayout.LabelField((chosenMove.Value.estimation?.ToString() ?? "Null") + ":\t\t" + chosenMove.Value.move, EditorStyles.boldLabel);
 			for (var i = 0; i < nextMoves.Count; ++i)
@@ -61,6 +76,13 @@ namespace etf.santorini.sv150155d.ui
 
 		private void Refresh()
 		{
+			no = null;
+			alphabeta = null;
+			optimized = null;
+			level = null;
+			estimator = null;
+			threshold = null;
+
 			chosenMove = null;
 			nextMoves.Clear();
 
@@ -69,10 +91,19 @@ namespace etf.santorini.sv150155d.ui
 			
 			var onTurnType = controller.OnTurn.GetType();
 			if (onTurnType != typeof(MiniMax)) return;
-			
+
+			// Warning: boxing
 			var isWaitingOnSpace = (bool)controller.GetType().GetField("IsWaitingOnSpace", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
 			if (!isWaitingOnSpace) return;
-			
+
+			// Warning: boxing
+			no = controller.OnTurn.No;
+			alphabeta = (bool)onTurnType.GetField("alphabeta", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller.OnTurn);
+			optimized = (bool)onTurnType.GetField("optimized", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller.OnTurn);
+			level = (int)onTurnType.GetField("level", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller.OnTurn);
+			estimator = (IEstimator)onTurnType.GetField("estimator", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller.OnTurn);
+			threshold = estimator.Threshold;
+
 			var dag = (HashDAGraph<string, float?, Move>)onTurnType.GetField("dag", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller.OnTurn);
 
 			// Warning: boxing
@@ -108,6 +139,18 @@ namespace etf.santorini.sv150155d.ui
 				if (v1.estimation == null && v2.estimation == null) return 0;
 				if (v1.estimation == null) return 1;
 				if (v2.estimation == null) return -1;
+
+				if
+				(
+					v1.estimation.Value == float.PositiveInfinity && v2.estimation.Value == float.PositiveInfinity
+					||
+					v1.estimation.Value == float.NegativeInfinity && v2.estimation.Value == float.NegativeInfinity
+				)
+					return 0;
+
+				if (v1.estimation.Value == float.PositiveInfinity || v2.estimation.Value == float.NegativeInfinity) return -1;
+				if (v2.estimation.Value == float.PositiveInfinity || v1.estimation.Value == float.NegativeInfinity) return 1;
+
 				return Math.Sign((float)v2.estimation - (float)v1.estimation);
 			});
 		}

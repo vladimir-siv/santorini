@@ -5,8 +5,8 @@ namespace etf.santorini.sv150155d.game
 	public sealed class Building : MonoBehaviour
 	{
 		public const int TILES_COUNT = 3;
-		private readonly Color[] tileColors = new Color[TILES_COUNT] { Color.cyan, Color.yellow, Color.green };
-		private readonly Color domeColor = Color.red;
+		private readonly Color[] tileColors = new Color[TILES_COUNT] { new Color(.231f, .698f, .839f), new Color(.776f, .776f, .224f), new Color(.188f, .627f, .157f) };
+		private readonly Color domeColor = new Color(.627f, .165f, .157f);
 
 		public static int BuildingCount => TILES_COUNT + 1;
 

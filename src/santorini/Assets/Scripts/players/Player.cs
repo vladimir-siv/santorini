@@ -10,21 +10,38 @@ namespace etf.santorini.sv150155d.players
 	public abstract class Player
 	{
 		private static readonly IDictionary<Type, InjectionParser> PlayerInitializers = new Dictionary<Type, InjectionParser>();
+		private static readonly IDictionary<(Type, string), InjectionParser> InitializationContext = new Dictionary<(Type, string), InjectionParser>();
 		public static ICollection<Type> Types => PlayerInitializers.Keys;
 
 		public static void MapInitializer(Type type, InjectionParser initializer)
 		{
-			if (PlayerInitializers.ContainsKey(type)) PlayerInitializers[type] = initializer;
-			else PlayerInitializers.Add(type, initializer);
+			PlayerInitializers[type] = initializer;
 		}
 		public static void MapInitializer<T>(InjectionParser initializer)
 		{
 			MapInitializer(typeof(T), initializer);
 		}
-		public static InjectionParser FindInitializer(Type type)
+
+		public static InjectionParser GenerateInitializer(Type type, string tag)
 		{
-			if (PlayerInitializers.ContainsKey(type)) return PlayerInitializers[type];
-			else return null;
+			var clone = PlayerInitializers[type].Clone();
+			InitializationContext[(type, tag)] = clone;
+			return clone;
+		}
+
+		public static InjectionParser GenerateInitializer<T>(string tag)
+		{
+			return GenerateInitializer(typeof(T), tag);
+		}
+
+		public static InjectionParser FetchInitializer(Type type, string tag)
+		{
+			return InitializationContext[(type, tag)];
+		}
+
+		public static InjectionParser FetchInitializer<T>(string tag)
+		{
+			return FetchInitializer(typeof(T), tag);
 		}
 		
 		public virtual string Description => "Player";
@@ -45,7 +62,7 @@ namespace etf.santorini.sv150155d.players
 
 			if (PlayerInitializers.ContainsKey(this.GetType()))
 			{
-				OnPlayerInitialize(PlayerInitializers[this.GetType()]);
+				OnPlayerInitialize(FetchInitializer(this.GetType(), No.ToString()));
 			}
 		}
 
@@ -58,7 +75,7 @@ namespace etf.santorini.sv150155d.players
 			sb.Append(';');
 			sb.Append(No);
 
-			var initializer = FindInitializer(type);
+			var initializer = FetchInitializer(type, No.ToString());
 			foreach (var parameter in initializer.GetParameters())
 			{
 				sb.Append(';');
@@ -77,7 +94,7 @@ namespace etf.santorini.sv150155d.players
 			var type = Type.GetType(split[0]);
 			var no = Convert.ToInt32(split[1]);
 
-			var initializer = FindInitializer(type);
+			var initializer = GenerateInitializer(type, no.ToString());
 			for (var i = 2; i < split.Length; ++i)
 			{
 				var arg = split[i].Split('=');

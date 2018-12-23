@@ -7,14 +7,32 @@ namespace etf.santorini.sv150155d.ioc
 	{
 		public static InjectionParser Empty { get; private set; } = new InjectionParser(new string[] { });
 
-		private readonly IDictionary<string, string> parameters = new Dictionary<string, string>();
-		private readonly IDictionary<string, (Type t, object p)> parsers = new Dictionary<string, (Type, object)>();
-		private readonly IDictionary<string, string[]> choices = new Dictionary<string, string[]>();
+		private readonly IDictionary<string, string> parameters;
+		private readonly IDictionary<string, (Type t, object p)> parsers;
+		private readonly IDictionary<string, string[]> choices;
 
 		public int Size { get; }
 
+		private InjectionParser(IDictionary<string, string> parameters, IDictionary<string, (Type t, object p)> parsers, IDictionary<string, string[]> choices)
+		{
+			this.parameters = new Dictionary<string, string>(parameters);
+			this.parsers = new Dictionary<string, (Type, object)>(parsers);
+			this.choices = new Dictionary<string, string[]>();
+			
+			foreach (var c in choices)
+			{
+				MapChoices(c.Key, (string[])c.Value.Clone());
+			}
+
+			Size = this.parameters.Count;
+		}
+
 		public InjectionParser(params string[] parameters)
 		{
+			this.parameters = new Dictionary<string, string>();
+			this.parsers = new Dictionary<string, (Type, object)>();
+			this.choices = new Dictionary<string, string[]>();
+
 			for (var i = 0; i < parameters.Length; ++i)
 			{
 				this.parameters.Add(parameters[i], string.Empty);
@@ -22,6 +40,11 @@ namespace etf.santorini.sv150155d.ioc
 			}
 
 			Size = parameters.Length;
+		}
+
+		public InjectionParser Clone()
+		{
+			return new InjectionParser(parameters, parsers, choices);
 		}
 
 		public string this[string parameter]

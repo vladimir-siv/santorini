@@ -62,8 +62,8 @@ namespace etf.santorini.sv150155d.game
 			if (!loader.LoadGame)
 			{
 				// Warning: boxing
-				player1 = (Player)Activator.CreateInstance(Type.GetType(loader.Player1Class), 1);
-				player2 = (Player)Activator.CreateInstance(Type.GetType(loader.Player2Class), 2);
+				player1 = (Player)Activator.CreateInstance(Type.GetType(loader.Player1Class), loader.Player1No);
+				player2 = (Player)Activator.CreateInstance(Type.GetType(loader.Player2Class), loader.Player2No);
 				gameLog.Players(player1.Serialize(), player2.Serialize());
 
 				StartGame();
@@ -110,6 +110,9 @@ namespace etf.santorini.sv150155d.game
 
 			onTurn = player1;
 			IsInitialized = true;
+
+			// AI INSPECTOR
+			if (player1.GetType() != typeof(Human) && player2.GetType() != typeof(Human)) AI_Inspector.Init();
 		}
 
 		void LoadGame(GameSceneLoader loader)
@@ -140,14 +143,14 @@ namespace etf.santorini.sv150155d.game
 			}
 
 			// AI INSPECTOR
-			if (IsWaitingOnSpace && Input.GetKeyDown(KeyCode.Space))
+			if (!onTurn.IsAutoPlaying && IsWaitingOnSpace && Input.GetKeyDown(KeyCode.Space))
 			{
 				onSpace.Release();
 				IsWaitingOnSpace = false;
 			}
 
 			// AI INSPECTOR
-			if (Input.GetKeyDown(KeyCode.End))
+			if (!onTurn.IsAutoPlaying && Input.GetKeyDown(KeyCode.End))
 			{
 				trap = false;
 			}
@@ -178,7 +181,7 @@ namespace etf.santorini.sv150155d.game
 			// AI INSPECTOR
 			if (player1.GetType() != typeof(Human) && player2.GetType() != typeof(Human))
 			{
-				if (trap && !IsWaitingOnSpace)
+				if (!onTurn.IsAutoPlaying && trap && !IsWaitingOnSpace)
 				{
 					UI.Status = $"Status:\r\nPress space to let Player{onTurn.No} continue";
 					var spacePressed = System.Threading.Tasks.Task.Run(onSpace.Wait);
