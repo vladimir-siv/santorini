@@ -14,7 +14,7 @@ namespace etf.santorini.sv150155d.game
 
 	public sealed class GameController : MonoBehaviour
 	{
-		public static GameController CurrentReference { get; private set; }
+		public static GameController CurrentReference { get; private set; } = null;
 
 		public GameObject player1Object;
 		public GameObject player2Object;
@@ -121,6 +121,12 @@ namespace etf.santorini.sv150155d.game
 			StartGame();
 		}
 
+		// AI INSPECTOR
+		bool trap = true;
+		// AI INSPECTOR
+		bool IsWaitingOnSpace = false;
+		// AI INSPECTOR
+		System.Threading.SemaphoreSlim onSpace = new System.Threading.SemaphoreSlim(0, 1);
 		async void Update()
 		{
 			if (Input.GetKeyDown(KeyCode.Escape))
@@ -128,6 +134,20 @@ namespace etf.santorini.sv150155d.game
 				if (File.Exists(Config.SAVE_GAME_FILE)) File.Delete(Config.SAVE_GAME_FILE);
 				if (IsInitialized) gameLog.Save(Config.SAVE_GAME_FILE);
 				SceneManager.LoadScene("menu");
+				return;
+			}
+
+			// AI INSPECTOR
+			if (IsWaitingOnSpace && Input.GetKeyDown(KeyCode.Space))
+			{
+				onSpace.Release();
+				IsWaitingOnSpace = false;
+			}
+
+			// AI INSPECTOR
+			if (Input.GetKeyDown(KeyCode.End))
+			{
+				trap = false;
 			}
 
 			if (!IsInitialized || IsCalculating) return;
@@ -152,6 +172,20 @@ namespace etf.santorini.sv150155d.game
 			UI.Status = $"Status:\r\nPlayer{onTurn.No} preparing";
 			board.PrepareTurn(onTurn);
 			await onTurn.PrepareTurn();
+
+			// AI INSPECTOR
+			if (player1.GetType() != typeof(Human) && player2.GetType() != typeof(Human))
+			{
+				if (trap && !IsWaitingOnSpace)
+				{
+					UI.Status = $"Status:\r\nPress space to let Player{onTurn.No} continue";
+					await System.Threading.Tasks.Task.Run(() =>
+					{
+						IsWaitingOnSpace = true;
+						onSpace.Wait();
+					});
+				}
+			}
 
 			UI.Status = $"Status:\r\nPlayer{onTurn.No} selecting figure";
 			(char row, int col) playerFrom;
