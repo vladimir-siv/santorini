@@ -5,7 +5,8 @@
 
 	public interface IEstimator
 	{
-		float EstimateMoving(Player me, Player opponent, BoardState state, (char row, int col) from, (char row, int col) to);
-		float EstimateBuilding(Player me, Player opponent, BoardState state, (char row, int col) position);
+		float Threshold { get; set; }
+		float EstimateMove(in Player me, in Player opponent, in BoardState state, Move move);
+		float EstimateFinalState(in Player me, in Player opponent, in BoardState state);
 	}
 }

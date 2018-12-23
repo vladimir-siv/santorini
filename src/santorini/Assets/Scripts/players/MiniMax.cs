@@ -42,18 +42,67 @@ namespace etf.santorini.sv150155d.players
 			if (levels < 3) levels = 3;
 
 			var state = Pool<BoardState>.Create();
+			var clone = Pool<BoardState>.Create();
+
+			var me = this;
+			var opponent = GameController.CurrentReference.Opponent(this);
+			var onTurn = 0;
+			var hadOne = false;
+
+			((string hashkey, (char row, int col) from, (char row, int col) to, (char row, int col) build) possibility, float estimation)? bestMove = null;
 
 			var enumerator = dag.EnumerateLevelOrder(boardState);
-			for (var i = enumerator.Level; i <= levels - 2; enumerator.Next(), i = enumerator.Level)
+			for (var i = enumerator.Level; i <= levels - 2 && enumerator.IsValid; enumerator.Next(), i = enumerator.Level)
 			{
 				if (enumerator.Node.HashChildren) continue;
 
 				state.FromString(enumerator.Node.Key);
 
+				if (state.HasPlayerStandingOnLastLevel) continue;
+
+				if (optimized)
+				{
+					clone.FromString(enumerator.Node.Key);
+					onTurn = BoardState.FastExtractOnTurn(enumerator.Node.Key);
+					hadOne = false;
+					bestMove = null;
+				}
+
 				foreach (var possibility in state.PossibleOutcomes())
 				{
-					enumerator.Node.AddChild(possibility.hashkey, new Move(possibility.from, possibility.to, possibility.build));
+					var move = new Move(possibility.from, possibility.to, possibility.build);
+
+					if (optimized && onTurn == No)
+					{
+						var estimation = estimator.EstimateMove(me, opponent, clone, move);
+						if (estimation < estimator.Threshold)
+						{
+							if (!hadOne && (bestMove == null || estimation > bestMove.Value.estimation))
+							{
+								bestMove = (possibility, estimation);
+							}
+
+							continue;
+						}
+					}
 					
+					enumerator.Node.AddChild(possibility.hashkey, move);
+					
+					if (i == levels - 2)
+					{
+						lastLevel.Add(possibility.hashkey);
+					}
+
+					hadOne = true;
+				}
+
+				if (!hadOne)
+				{
+					var possibility = bestMove.Value.possibility;
+					var move = new Move(possibility.from, possibility.to, possibility.build);
+
+					enumerator.Node.AddChild(possibility.hashkey, move);
+
 					if (i == levels - 2)
 					{
 						lastLevel.Add(possibility.hashkey);
@@ -61,6 +110,7 @@ namespace etf.santorini.sv150155d.players
 				}
 			}
 
+			Pool<BoardState>.Destroy(clone);
 			Pool<BoardState>.Destroy(state);
 		}
 		private void Sync()
@@ -99,6 +149,7 @@ namespace etf.santorini.sv150155d.players
 			optimized = initializer.Resolve<bool>("optimized");
 			level = initializer.Resolve<int>("level");
 			estimator = initializer.Resolve<IEstimator>("estimation");
+			estimator.Threshold = initializer.Resolve<float>("threshold");
 
 			if (level < 3) level = 3;
 		}
@@ -141,111 +192,117 @@ namespace etf.santorini.sv150155d.players
 
 			await Task.Run(() =>
 			{
-				float extractValue(int onTurn, float? nodeValue, float? childValue)
-				{
-					if (nodeValue != null)
-					{
-						if (onTurn == No) return Math.Max((float)nodeValue, (float)childValue);
-						else return Math.Min((float)nodeValue, (float)childValue);
-					}
-					else return (float)childValue;
-				}
-
 				if (dag.Root == null) Sync();
 				else Resync();
-
-				stack.Clear();
-
-				var state = Pool<BoardState>.Create();
-				var clone = Pool<BoardState>.Create();
-
-				var me = this;
-				var opponent = GameController.CurrentReference.Opponent(this);
 				
-				HashCollection<string, float?, Move>.Node node = dag.Root;
-				IEnumerator<HashCollection<string, float?, Move>.Node> i = null;
-				float alpha = float.NegativeInfinity;
-				float beta = float.PositiveInfinity;
-				if (node != null)
-				{
-					node.Value = null;
-					i = node.EnumerateChildren().GetEnumerator();
-					i.MoveNext();
-				}
-				while (true)
-				{
-					while (node != null)
-					{
-						stack.Push((node, i, alpha, beta));
+				var chosenMove = new Move();
 
-						node = i.Current;
-						if (node != null)
+				if (dag.Root.ChildrenCount > 1)
+				{
+					float extractValue(int onTurn, float? nodeValue, float? childValue)
+					{
+						if (nodeValue != null)
 						{
-							node.Value = null;
-							i = node.EnumerateChildren().GetEnumerator();
-							i.MoveNext();
+							if (onTurn == No) return Math.Max((float)nodeValue, (float)childValue);
+							else return Math.Min((float)nodeValue, (float)childValue);
 						}
+						else return (float)childValue;
 					}
 
-					if (stack.Count > 0)
+					stack.Clear();
+
+					var state = Pool<BoardState>.Create();
+					var clone = Pool<BoardState>.Create();
+
+					var me = this;
+					var opponent = GameController.CurrentReference.Opponent(this);
+
+					HashCollection<string, float?, Move>.Node node = dag.Root;
+					IEnumerator<HashCollection<string, float?, Move>.Node> i = null;
+					float alpha = float.NegativeInfinity;
+					float beta = float.PositiveInfinity;
+					if (node != null)
 					{
-						(node, i, alpha, beta) = stack.Pop();
-
-						// Hack to quickly get BoardState.OnTurn from string
-						var onTurn = Convert.ToInt32(node.Key.Substring(node.Key.LastIndexOf('|') + 1));
-
-						if (node.HashChildren)
+						node.Value = null;
+						i = node.EnumerateChildren().GetEnumerator();
+						i.MoveNext();
+					}
+					while (true)
+					{
+						while (node != null)
 						{
-							node.Value = extractValue(onTurn, node.Value, i.Current.Value);
+							stack.Push((node, i, alpha, beta));
 
-							if (alphabeta)
+							node = i.Current;
+							if (node != null)
 							{
-								if (onTurn == No) alpha = (float)node.Value;
-								else beta = (float)node.Value;
+								node.Value = null;
+								i = node.EnumerateChildren().GetEnumerator();
+								i.MoveNext();
 							}
-
-							// node = next;
-							if (!i.MoveNext() || (alphabeta && alpha >= beta)) node = null;
 						}
-						else
+
+						if (stack.Count > 0)
 						{
-							float? finalEstimation = null;
-
-							state.FromString(node.Key);
-							clone.FromString(node.Key);
-
-							foreach (var possibility in state.PossibleOutcomes())
-							{
-								var estimation = estimator.EstimateMoving(me, opponent, clone, possibility.from, possibility.to);
-								clone.MoveFigure(possibility.from, possibility.to);
-								estimation += estimator.EstimateBuilding(me, opponent, clone, possibility.build);
-								clone.MoveFigure(possibility.to, possibility.from);
-								finalEstimation = extractValue(onTurn, finalEstimation, estimation);
-							}
-
-							node.Value = finalEstimation;
+							(node, i, alpha, beta) = stack.Pop();
 							
-							// node = next;
-							node = null;
-						}
-					}
-					else break;
-				}
-				
-				Pool<BoardState>.Destroy(clone);
-				Pool<BoardState>.Destroy(state);
+							var onTurn = BoardState.FastExtractOnTurn(node.Key);
 
-				foreach (var child in dag.Root.EnumerateChildren())
-				{
-					if (child.Value >= dag.Root.Value)
-					{
-						var bestMove = dag.Root.GetWeight(child.Key);
-						select = bestMove.FromPosition;
-						move = bestMove.ToPosition;
-						build = bestMove.BuildOn;
-						break;
+							if (node.HashChildren)
+							{
+								var oldValue = node.Value;
+								node.Value = extractValue(onTurn, node.Value, i.Current.Value);
+
+								if (node == dag.Root && oldValue != node.Value)
+								{
+									chosenMove = dag.Root.GetWeight(i.Current.Key);
+								}
+
+								if (alphabeta)
+								{
+									if (onTurn == No) alpha = (float)node.Value;
+									else beta = (float)node.Value;
+								}
+
+								// node = next;
+								if ((onTurn == No && node.Value == float.PositiveInfinity || onTurn != No && node.Value == float.NegativeInfinity) || (!i.MoveNext()) || (alphabeta && alpha >= beta)) node = null;
+							}
+							else
+							{
+								float? finalEstimation = null;
+								var hadMove = false;
+
+								state.FromString(node.Key);
+								clone.FromString(node.Key);
+
+								if (!state.HasPlayerStandingOnLastLevel)
+								{
+									foreach (var possibility in state.PossibleOutcomes())
+									{
+										var estimation = estimator.EstimateMove(me, opponent, clone, new Move(possibility.from, possibility.to, possibility.build));
+										finalEstimation = extractValue(onTurn, finalEstimation, estimation);
+										hadMove = true;
+									}
+								}
+
+								if (hadMove) node.Value = finalEstimation;
+								else node.Value = estimator.EstimateFinalState(me, opponent, clone);
+
+								// node = next;
+								node = null;
+							}
+						}
+						else break;
 					}
+
+					Pool<BoardState>.Destroy(clone);
+					Pool<BoardState>.Destroy(state);
 				}
+				else chosenMove = dag.Root.GetWeight(dag.Root.FirstChild);
+
+				select = chosenMove.FromPosition;
+				move = chosenMove.ToPosition;
+				build = chosenMove.BuildOn;
 			});
 		}
 

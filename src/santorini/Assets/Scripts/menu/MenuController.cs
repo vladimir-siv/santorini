@@ -8,6 +8,7 @@ using UnityEngine.UI;
 
 namespace etf.santorini.sv150155d.menu
 {
+	using initialization;
 	using ioc;
 	using scenes;
 	using players;
@@ -45,7 +46,7 @@ namespace etf.santorini.sv150155d.menu
 
 		void Awake()
 		{
-			InjectionMapper.Initialize();
+			Global.Initialize();
 		}
 
 		void Start()
@@ -183,6 +184,11 @@ namespace etf.santorini.sv150155d.menu
 					{
 						instance.contentType = TMP_InputField.ContentType.IntegerNumber;
 						instance.text = "0";
+					}
+					if (resolvedType == typeof(float))
+					{
+						instance.contentType = TMP_InputField.ContentType.DecimalNumber;
+						instance.text = "0.0";
 					}
 
 					initialValues[parameter] = instance.text;

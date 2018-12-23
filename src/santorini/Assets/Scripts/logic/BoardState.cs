@@ -18,6 +18,12 @@ namespace etf.santorini.sv150155d.logic
 			PoolInjector.Map<BoardState, string>(injector);
 		}
 
+		public static int FastExtractOnTurn(string boardState)
+		{
+			// Hack to quickly get BoardState.OnTurn from string
+			return Convert.ToInt32(boardState.Substring(boardState.LastIndexOf('|') + 1));
+		}
+
 		private readonly (int level, Player standing)[,] state = new (int level, Player standing)[5, 5]
 		{
 			{ (-1, null), (-1, null), (-1, null), (-1, null), (-1, null) },
@@ -36,8 +42,13 @@ namespace etf.santorini.sv150155d.logic
 		private GameController controller = null;
 		private StringBuilder sb = new StringBuilder();
 
+		public bool HasPlayerOnTurnStandingOnLastLevel => IsPlayerStandingOnLastLevel(controller.FirstPlayer.No == OnTurn ? controller.FirstPlayer : controller.SecondPlayer);
+		public bool HasPlayerNotOnTurnStandingOnLastLevel => IsPlayerStandingOnLastLevel(controller.FirstPlayer.No != OnTurn ? controller.FirstPlayer : controller.SecondPlayer);
+		public bool HasPlayerStandingOnLastLevel => HasPlayerOnTurnStandingOnLastLevel || HasPlayerNotOnTurnStandingOnLastLevel;
+
+		public BoardState() { controller = GameController.CurrentReference; }
 		public void OnCreate() { controller = GameController.CurrentReference; for (var i = 0; i < 4; ++i) positions[i % 2, i / 2] = "??"; OnTurn = null; }
-		public void OnCreate(string boardState) { OnCreate(); FromString(boardState); }
+		public void OnCreate(string boardState) { controller = GameController.CurrentReference; FromString(boardState); }
 		public void OnDestroy() { }
 
 		public (int level, Player standing) this[(char row, int col) position]
@@ -56,6 +67,11 @@ namespace etf.santorini.sv150155d.logic
 			set => state[row, col] = value;
 		}
 
+		public bool IsPlayerStandingOnLastLevel(Player player)
+		{
+			var positions = FindFieldsWithPlayer(player);
+			return this[positions.p1].level == Building.TILES_COUNT - 1 || this[positions.p2].level == Building.TILES_COUNT - 1;
+		}
 		public List<(char row, int col)> FindAdjacentFields((char row, int col) position, bool constrainLevels = false, bool constrainBlockedOrFilled = false, bool constrainSelf = true)
 		{
 			var currentField = this[position.row, position.col];

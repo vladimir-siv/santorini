@@ -5,12 +5,14 @@
 
 	public class Hard : IEstimator
 	{
-		public float EstimateMoving(Player me, Player opponent, BoardState state, (char row, int col) from, (char row, int col) to)
+		public float Threshold { get; set; } = float.NegativeInfinity;
+
+		public float EstimateMove(in Player me, in Player opponent, in BoardState state, Move move)
 		{
 			throw new System.NotImplementedException();
 		}
 
-		public float EstimateBuilding(Player me, Player opponent, BoardState state, (char row, int col) position)
+		public float EstimateFinalState(in Player me, in Player opponent, in BoardState state)
 		{
 			throw new System.NotImplementedException();
 		}

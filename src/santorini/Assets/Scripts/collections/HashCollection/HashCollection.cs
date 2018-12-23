@@ -18,6 +18,15 @@ namespace etf.santorini.sv150155d.collections
 			public TValue Value { get; set; } = default;
 			public int ChildrenCount => children.Count;
 			public bool HashChildren => ChildrenCount > 0;
+			public TKey FirstChild
+			{
+				get
+				{
+					var enumerator = children.Keys.GetEnumerator();
+					enumerator.MoveNext();
+					return enumerator.Current;
+				}
+			}
 
 			public Node this[TKey child] => Container.nodes[child];
 			public Node this[int index]

@@ -44,9 +44,9 @@ namespace etf.santorini.sv150155d.logic
 
 		public void Set(Board board)
 		{
-			state.OnCreate();
-
 			Detach();
+
+			state.OnCreate();
 
 			this.board = board;
 
