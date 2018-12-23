@@ -2,7 +2,6 @@
 
 namespace etf.santorini.sv150155d.ai
 {
-	using game;
 	using logic;
 	using players;
 

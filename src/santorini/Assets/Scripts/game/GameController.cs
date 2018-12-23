@@ -122,6 +122,8 @@ namespace etf.santorini.sv150155d.game
 		}
 
 		// AI INSPECTOR
+		public event Action OnWaitSpace;
+		// AI INSPECTOR
 		bool trap = true;
 		// AI INSPECTOR
 		bool IsWaitingOnSpace = false;
@@ -179,11 +181,12 @@ namespace etf.santorini.sv150155d.game
 				if (trap && !IsWaitingOnSpace)
 				{
 					UI.Status = $"Status:\r\nPress space to let Player{onTurn.No} continue";
-					await System.Threading.Tasks.Task.Run(() =>
-					{
-						IsWaitingOnSpace = true;
-						onSpace.Wait();
-					});
+					var spacePressed = System.Threading.Tasks.Task.Run(onSpace.Wait);
+
+					IsWaitingOnSpace = true;
+					OnWaitSpace?.Invoke();
+
+					await spacePressed;
 				}
 			}
 
