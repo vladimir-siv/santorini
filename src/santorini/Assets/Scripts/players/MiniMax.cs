@@ -13,7 +13,7 @@ namespace etf.santorini.sv150155d.players
 
 	public class MiniMax : Player
 	{
-		private GameController controller = GameController.CurrentReference;
+		private readonly GameController controller = GameController.CurrentReference;
 		private BoardProxy board = BoardProxy.Reference;
 		
 		private Random rnd = new Random();
@@ -159,27 +159,32 @@ namespace etf.santorini.sv150155d.players
 			if (IsAutoPlaying) await base.PrepareTurn();
 			else await Task.CompletedTask;
 		}
-
-		public override async Task<(char, int)> PlaceFigure1()
+		
+		private (char, int) GenerateRandomField()
 		{
-			if (IsAutoPlaying) return await base.PlaceFigure1();
-
 			var field = rnd.Next(9);
 			char row = (char)('B' + field / 3);
 			int col = 2 + field % 3;
 
+			if (rnd.Next(100) < 10) row = 'A';
+			else if (rnd.Next(100) < 10) row = 'E';
+
+			if (rnd.Next(100) < 10) col = 1;
+			else if (rnd.Next(100) < 10) col = 5;
+
 			return (row, col);
+		}
+
+		public override async Task<(char, int)> PlaceFigure1()
+		{
+			if (IsAutoPlaying) return await base.PlaceFigure1();
+			return GenerateRandomField();
 		}
 
 		public override async Task<(char, int)> PlaceFigure2()
 		{
 			if (IsAutoPlaying) return await base.PlaceFigure2();
-
-			var field = rnd.Next(9);
-			char row = (char)('B' + field / 3);
-			int col = 2 + field % 3;
-
-			return (row, col);
+			return GenerateRandomField();
 		}
 
 		public override async Task PrepareTurn()
@@ -297,6 +302,8 @@ namespace etf.santorini.sv150155d.players
 
 					Pool<BoardState>.Destroy(clone);
 					Pool<BoardState>.Destroy(state);
+
+					if (optimized) estimator.Threshold = (float)dag.Root.Value;
 				}
 				else chosenMove = dag.Root.GetWeight(dag.Root.FirstChild);
 

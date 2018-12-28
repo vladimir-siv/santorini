@@ -63,10 +63,10 @@ namespace etf.santorini.sv150155d.ui
 
 			scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(300), GUILayout.Height(300));
 
-			if (chosenMove != null) EditorGUILayout.LabelField((chosenMove.Value.estimation?.ToString() ?? "Null") + ":\t\t" + chosenMove.Value.move, EditorStyles.boldLabel);
+			if (chosenMove != null) EditorGUILayout.LabelField((chosenMove.Value.estimation?.ToString("0.00") ?? "Null") + ":\t\t" + chosenMove.Value.move, EditorStyles.boldLabel);
 			for (var i = 0; i < nextMoves.Count; ++i)
 			{
-				EditorGUILayout.LabelField((nextMoves[i].estimation?.ToString() ?? "Null") + ":\t\t" + nextMoves[i].move);
+				EditorGUILayout.LabelField((nextMoves[i].estimation?.ToString("0.00") ?? "Null") + ":\t\t" + nextMoves[i].move);
 			}
 
 			EditorGUILayout.EndScrollView();

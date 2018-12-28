@@ -1,3 +1,3 @@
-Easy => 3.5
-Medium => ?
-Hard => ?
+Easy => 2.5
+Medium => 4.0
+Hard => -10.0

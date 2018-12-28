@@ -6,7 +6,7 @@
 	public interface IEstimator
 	{
 		float Threshold { get; set; }
-		float EstimateMove(in Player me, in Player opponent, in BoardState state, Move move);
-		float EstimateFinalState(in Player me, in Player opponent, in BoardState state);
+		float EstimateMove(Player me, Player opponent, BoardState state, Move move);
+		float EstimateFinalState(Player me, Player opponent, BoardState state);
 	}
 }

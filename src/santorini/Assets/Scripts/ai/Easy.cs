@@ -7,9 +7,11 @@ namespace etf.santorini.sv150155d.ai
 
 	public class Easy : IEstimator
 	{
-		public float Threshold { get; set; } = float.NegativeInfinity;
+		private bool isSet = false;
+		private float threshold = float.NegativeInfinity;
+		public float Threshold { get => threshold; set { if (!isSet) threshold = value; isSet = true; } }
 
-		public float EstimateMove(in Player me, in Player opponent, in BoardState state, Move move)
+		public float EstimateMove(Player me, Player opponent, BoardState state, Move move)
 		{
 			float distance((char row, int col) from, (char row, int col) to) => Math.Max(Math.Abs(from.row - to.row), Math.Abs(from.col - to.col));
 
@@ -19,16 +21,17 @@ namespace etf.santorini.sv150155d.ai
 			var myPositions = state.FindFieldsWithPlayer(me);
 			var opponentPositions = state.FindFieldsWithPlayer(opponent);
 
-			var myDistance = Math.Min(distance(myPositions.p1, move.BuildOn), distance(myPositions.p2, move.BuildOn));
+			var myDistance = 1; //Math.Min(distance(myPositions.p1, move.BuildOn), distance(myPositions.p2, move.BuildOn));
 			var opponentDistance = Math.Min(distance(opponentPositions.p1, move.BuildOn), distance(opponentPositions.p2, move.BuildOn));
 
 			l *= opponentDistance - myDistance;
 
 			var f = m + l;
-			return state.OnTurn == me.No ? f : -f;
+			return f;
+			//return state.OnTurn == me.No ? f : -f;
 		}
 
-		public float EstimateFinalState(in Player me, in Player opponent, in BoardState state)
+		public float EstimateFinalState(Player me, Player opponent, BoardState state)
 		{
 			if (state.IsPlayerStandingOnLastLevel(me)) return float.PositiveInfinity;
 			if (state.IsPlayerStandingOnLastLevel(opponent)) return float.NegativeInfinity;
