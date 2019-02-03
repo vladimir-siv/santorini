@@ -1,2 +1,2 @@
-# santorini
-Collage Game Project + AI
+# santorinii
+College Game Project + AI
